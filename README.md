@@ -44,6 +44,10 @@ press «Hent nye økter», and automatically every 10 minutes while anyone is us
 
 ## Deploying
 
-Any Node host with Postgres works (Vercel + Neon, or Railway). Set `DATABASE_URL`, `APP_URL`
-(the public https origin, used for invite links and the Strava callback) and the Strava keys, then
-run `npm run db:migrate` against the production database.
+Live at https://svettebotta.vercel.app (Vercel project «svettebotta» on Preben's projects, region
+fra1). Every push to `main` deploys. The database is a free Neon project (Frankfurt) in the
+personal Neon organisation – not the Vercel-managed one, which is on a paid plan.
+
+Environment: `DATABASE_URL` (pooled Neon string), `APP_URL` (https://svettebotta.vercel.app) and,
+once set up, the Strava keys. `npm run build` runs the migrations first, so a deploy always brings
+the database schema up to date.
