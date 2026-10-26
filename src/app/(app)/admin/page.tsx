@@ -32,10 +32,17 @@ function ChallengeFields({ c }: { c?: Challenge }) {
         <label className="block"><span className="label">Min per økt</span><input type="number" min={1} name="session_minutes" className="field" defaultValue={c?.session_minutes ?? 35} required /></label>
         <label className="block"><span className="label">Bot (kr)</span><input type="number" min={0} name="penalty_kr" className="field" defaultValue={c?.penalty_kr ?? 50} required /></label>
       </div>
-      <label className="block">
-        <span className="label">Eller én langøkt på (min) – tomt = ikke lov</span>
-        <input type="number" min={1} name="long_session_minutes" className="field" defaultValue={c ? (c.long_session_minutes ?? "") : 60} />
-      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="label">Langøkt fra (min) – tomt = ingen langøkt</span>
+          <input type="number" min={1} name="long_session_minutes" className="field" defaultValue={c ? (c.long_session_minutes ?? "") : 60} />
+        </label>
+        <label className="block">
+          <span className="label">Langøkt teller som (økter)</span>
+          <input type="number" min={1} name="long_session_counts" className="field" defaultValue={c?.long_session_counts ?? 2} />
+        </label>
+      </div>
+      <p className="-mt-1 text-xs text-muted">Sett «teller som» lik antall økter per uke hvis én langøkt skal holde for hele uka.</p>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
           <span className="label">Sjekk inn innen (timer) – tomt = før uka er over</span>

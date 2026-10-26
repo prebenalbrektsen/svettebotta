@@ -1,8 +1,8 @@
 import type { Challenge, WeekResult } from "@/lib/challenge";
 
-/** One segment per required workout; a long workout fills them all. */
+/** One segment per required workout; a long workout fills as many as it is worth. */
 export function WeekProgress({ c, r, small }: { c: Challenge; r: WeekResult; small?: boolean }) {
-  const filled = r.hasLong ? c.min_sessions : Math.min(r.qualifying, c.min_sessions);
+  const filled = Math.min(r.qualifying, c.min_sessions);
   return (
     <div className={`flex ${small ? "gap-1" : "gap-1.5"}`} aria-label={`${filled} av ${c.min_sessions}`}>
       {Array.from({ length: c.min_sessions }, (_, i) => (

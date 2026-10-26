@@ -10,6 +10,7 @@ export type Challenge = {
   min_sessions: number;
   session_minutes: number;
   long_session_minutes: number | null;
+  long_session_counts: number;
   vipps_info: string | null;
   check_in_hours: number | null;
   max_per_day: number | null;
@@ -82,7 +83,11 @@ export async function activeChallenge(): Promise<Challenge | null> {
 /** The challenge's rules as short phrases, for chips and the rules recap. */
 export function ruleParts(c: Challenge): string[] {
   const parts = [`${c.min_sessions} × ${c.session_minutes} min`];
-  if (c.long_session_minutes) parts.push(`eller 1 × ${c.long_session_minutes} min`);
+  if (c.long_session_minutes) {
+    parts.push(c.long_session_counts >= c.min_sessions
+      ? `eller 1 × ${c.long_session_minutes} min`
+      : `${c.long_session_minutes}+ min teller som ${c.long_session_counts}`);
+  }
   if (c.max_per_day) parts.push(c.max_per_day === 1 ? "maks 1 økt per dag" : `maks ${c.max_per_day} økter per dag`);
   parts.push(c.check_in_hours ? `sjekk inn innen ${c.check_in_hours} t` : "sjekk inn før uka er over");
   if (c.proof_required) parts.push("bilde påkrevd");
@@ -139,6 +144,11 @@ export function annotate(c: Challenge, workouts: Workout[], now = new Date()): W
   return workouts;
 }
 
+/** How many of the week's workouts this one is worth: 1, or more for a long workout. */
+export function workoutCredit(c: Challenge, w: Pick<Workout, "duration_min">): number {
+  return c.long_session_minutes && w.duration_min >= c.long_session_minutes ? Math.max(1, c.long_session_counts) : 1;
+}
+
 export function meetsTask(w: Workout, task: WeeklyTask | undefined): boolean {
   return !!task && (w.meets_task || task.auto_sports.includes(w.sport));
 }
@@ -148,8 +158,10 @@ export function evaluateWeek(c: Challenge, week: string, workouts: Workout[], ta
   annotate(c, workouts);
   const counted = workouts.filter((w) => w.status === "counts");
   const checkedIn = workouts.filter((w) => w.checked_in_at && !w.rejected);
-  const hasLong = !!c.long_session_minutes && checkedIn.some((w) => w.duration_min >= c.long_session_minutes!);
-  const volumeMet = counted.length >= c.min_sessions || hasLong;
+  // A long workout is worth `long_session_counts` of the week's workouts.
+  const credits = counted.reduce((n, w) => n + workoutCredit(c, w), 0);
+  const hasLong = counted.some((w) => workoutCredit(c, w) > 1);
+  const volumeMet = credits >= c.min_sessions;
   // The task workout has to be a real one: checked in and long enough to count on its own.
   const taskMet = !task || checkedIn.some((w) => w.duration_min >= c.session_minutes && meetsTask(w, task));
   const state: WeekResult["state"] = week > today ? "future" : addDays(week, 6) < today ? "done" : "running";
@@ -157,7 +169,7 @@ export function evaluateWeek(c: Challenge, week: string, workouts: Workout[], ta
     week,
     state,
     workouts,
-    qualifying: counted.length,
+    qualifying: credits,
     hasLong,
     volumeMet,
     taskMet,

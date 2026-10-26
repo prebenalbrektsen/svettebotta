@@ -197,6 +197,7 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
     int(form, "max_per_day"),
     form.get("proof_required") === "on",
     String(form.get("description") ?? "").trim() || null,
+    Math.max(1, int(form, "long_session_counts") ?? 2),
   ];
   if (!values[0] || !values[1] || !values[2] || values[3] == null || !values[4] || !values[5]) return { error: "Fyll inn alle feltene." };
   if (values[2]! < values[1]!) return { error: "Sluttdato må være etter startdato." };
@@ -204,14 +205,14 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
     await query(
       `update challenges set name = $2, starts_on = $3, ends_on = $4, penalty_kr = $5, min_sessions = $6,
          session_minutes = $7, long_session_minutes = $8, vipps_info = $9, check_in_hours = $10, max_per_day = $11,
-         proof_required = $12, description = $13 where id = $1`,
+         proof_required = $12, description = $13, long_session_counts = $14 where id = $1`,
       [id, ...values],
     );
   } else {
     const c = await one<Challenge>(
       `insert into challenges (name, starts_on, ends_on, penalty_kr, min_sessions, session_minutes, long_session_minutes, vipps_info,
-         check_in_hours, max_per_day, proof_required, description)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning *`,
+         check_in_hours, max_per_day, proof_required, description, long_session_counts)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning *`,
       values,
     );
     // Nobody is signed up automatically: everyone gets a «Bli med» card and opts in.

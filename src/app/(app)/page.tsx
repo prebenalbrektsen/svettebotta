@@ -98,7 +98,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
           <p className="mt-2 text-sm text-muted">
             {myWeek.state === "before"
               ? "Du er med fra neste uke."
-              : myWeek.hasLong ? `Langøkt på ${c.long_session_minutes}+ min er gjort.` : `${myWeek.qualifying} av ${c.min_sessions} økter sjekket inn`}
+              : `${Math.min(myWeek.qualifying, c.min_sessions)} av ${c.min_sessions} økter sjekket inn${myWeek.hasLong ? ` (langøkt teller ×${c.long_session_counts})` : ""}`}
             {task && myWeek.state !== "before" && (myWeek.taskMet ? " · ukeskrav ✓" : " · ukeskrav mangler")}
           </p>
           {myWeek.state !== "done" && myWeek.state !== "before" && !myWeek.passed && (

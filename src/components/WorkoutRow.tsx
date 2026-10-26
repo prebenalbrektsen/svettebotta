@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Challenge, WeeklyTask, Workout } from "@/lib/challenge";
-import { checkInDeadline, meetsTask } from "@/lib/challenge";
+import { checkInDeadline, meetsTask, workoutCredit } from "@/lib/challenge";
 import { sportIcon, sportLabel } from "@/lib/sports";
 import { formatMinutes, relativeTime } from "@/lib/time";
 import { approveWorkout, deleteWorkout, toggleKudos, toggleMeetsTask, toggleRejected } from "@/app/(app)/actions";
@@ -12,10 +12,11 @@ function timeLeft(deadline: Date): string {
   return min >= 60 ? `${Math.floor(min / 60)} t igjen` : `${min} min igjen`;
 }
 
-/** What the workout means for the week. «Teller» is the normal case, so it gets no label. */
+/** What the workout means for the week. A plain «teller» is the normal case, so it gets no label. */
 function StatusPill({ w, c }: { w: Workout; c: Challenge }) {
   const pill = (cls: string, text: string) => <span className={`rounded px-1.5 py-0.5 ${cls}`}>{text}</span>;
   switch (w.status) {
+    case "counts": return workoutCredit(c, w) > 1 ? pill("bg-ok-soft text-ok", `Langøkt – teller ×${workoutCredit(c, w)}`) : null;
     case "pending": return pill("bg-warn-soft text-warn", `Venter på innsjekk · ${timeLeft(checkInDeadline(c, w))}`);
     case "expired": return pill("bg-line text-muted", "Ikke sjekket inn i tide");
     case "short": return pill("bg-line text-muted", `Under ${c.session_minutes} min – teller ikke`);
@@ -67,7 +68,7 @@ export function WorkoutRow({
           <Link href={`/okt/${w.id}`}>{w.title || sportLabel(w.sport)}</Link>
         </p>
         <p className="truncate text-sm text-muted">{meta.join(" · ")}</p>
-        {(w.status !== "counts" || (task && w.checked_in_at && meetsTask(w, task))) && (
+        {(w.status !== "counts" || workoutCredit(c, w) > 1 || (task && w.checked_in_at && meetsTask(w, task))) && (
           <p className="mt-1 flex flex-wrap gap-1.5 text-xs font-semibold">
             <StatusPill w={w} c={c} />
             {task && w.checked_in_at && meetsTask(w, task) && <span className="rounded bg-ok-soft px-1.5 py-0.5 text-ok">✓ {task.title}</span>}
