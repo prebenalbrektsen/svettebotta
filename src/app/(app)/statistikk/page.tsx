@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { StatTiles } from "@/components/StatTiles";
 import { requireUser } from "@/lib/auth";
-import { BOARDS, personStats, rank, type BoardId, type Period } from "@/lib/leaderboard";
+import { BOARDS, personStats, rank, sportBoards, type Period } from "@/lib/leaderboard";
 import { activeChallenge, loadBoard } from "@/lib/challenge";
 import { Icon } from "@/components/Icon";
 import { sportIcon, sportLabel } from "@/lib/sports";
@@ -15,9 +15,12 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
   const c = await activeChallenge();
   if (!c) return <p className="pt-6 text-muted">Ingen utfordring ennå.</p>;
   const board = await loadBoard(c);
-  const boardId = (BOARDS.some((b) => b.id === tavle) ? tavle : "uker") as BoardId;
   const period: Period = periode === "uke" ? "uke" : "alt";
-  const ranking = rank(await personStats(c, board, period), boardId);
+  const statsForPeriod = await personStats(c, board, period);
+  const perSport = sportBoards(statsForPeriod);
+  const boardId = [...BOARDS, ...perSport].some((b) => b.id === tavle) ? tavle! : "uker";
+  // On a per-sport board, only people who actually did that kind of training.
+  const ranking = rank(statsForPeriod, boardId).filter((r) => !boardId.startsWith("sport-") || r.value > 0);
   const best = Math.max(1, ...ranking.map((r) => r.value));
   const link = (t: string, p: string) => `?tavle=${t}&periode=${p}`;
   const all = computeStats(board.members.flatMap((m) => m.workouts));
@@ -41,11 +44,21 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
             <Link href={link(boardId, "alt")} className={`rounded-full px-3 py-1.5 ${period === "alt" ? "bg-ink text-paper" : "text-muted"}`}>Hele utfordringen</Link>
           </div>
         </div>
-        <nav className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1" aria-label="Velg tavle">
+        <nav className="-mx-4 mb-2 flex gap-1.5 overflow-x-auto px-4 pb-1" aria-label="Velg tavle">
           {BOARDS.filter((b) => period === "alt" || b.id !== "streak").map((b) => (
             <Link key={b.id} href={link(b.id, period)} className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold ${boardId === b.id ? "border-ink bg-ink text-paper" : "border-line"}`}>{b.label}</Link>
           ))}
         </nav>
+        {perSport.length > 0 && (
+          <>
+            <p className="mb-1.5 text-xs font-bold tracking-wider text-muted uppercase">Per treningsform</p>
+            <nav className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1" aria-label="Velg treningsform">
+              {perSport.map((b) => (
+                <Link key={b.id} href={link(b.id, period)} className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold ${boardId === b.id ? "border-heat bg-heat text-white" : "border-line"}`}>{b.label}</Link>
+              ))}
+            </nav>
+          </>
+        )}
         <ol className="space-y-3">
           {ranking.map(({ p, value, text }, i) => (
             <li key={p.m.id} className={p.m.id === user.id ? "-mx-2 rounded-xl bg-heat-soft/60 px-2 py-1" : ""}>

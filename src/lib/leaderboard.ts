@@ -17,6 +17,7 @@ export type PersonStats = {
   streak: number; // weeks in a row in the bag, up to now
   bestStreak: number;
   longest: Workout | null;
+  ws: Workout[]; // the counted workouts in the period, for the per-sport boards
 };
 
 const counts = (w: Workout) => !!w.checked_in_at && !w.rejected;
@@ -56,6 +57,7 @@ export async function personStats(c: Challenge, board: Board, period: Period): P
       streak,
       bestStreak: best,
       longest: ws.reduce<Workout | null>((a, w) => (!a || w.duration_min > a.duration_min ? w : a), null),
+      ws,
     };
   });
 }
@@ -70,10 +72,50 @@ export const BOARDS = [
   { id: "streak", label: "Uker på rad", value: (p: PersonStats) => p.streak, fmt: (v: number) => `${v} på rad`, tie: (p: PersonStats) => p.bestStreak },
 ] as const;
 
-export type BoardId = (typeof BOARDS)[number]["id"];
+// Per-sport boards: one per kind of training, measured the way that makes sense for it.
+// They only show up once someone has logged that kind of workout.
+type Unit = "km" | "m" | "t";
+const SPORT_BOARDS: { id: string; label: string; sports: string[]; unit: Unit }[] = [
+  { id: "styrke", label: "Styrke / gym", sports: ["WeightTraining", "Crossfit", "HighIntensityIntervalTraining", "Workout"], unit: "t" },
+  { id: "loping", label: "Løping", sports: ["Run", "TrailRun", "VirtualRun"], unit: "km" },
+  { id: "sykkel", label: "Sykkel", sports: ["Ride", "VirtualRide", "GravelRide", "MountainBikeRide", "EBikeRide"], unit: "km" },
+  { id: "svomming", label: "Svømming", sports: ["Swim"], unit: "m" },
+  { id: "gaing", label: "Gåtur og fjelltur", sports: ["Walk", "Hike"], unit: "km" },
+  { id: "ski", label: "Ski", sports: ["NordicSki", "BackcountrySki", "RollerSki"], unit: "km" },
+  { id: "alpint", label: "Alpint", sports: ["AlpineSki", "Snowboard"], unit: "t" },
+  { id: "padling", label: "Padling og roing", sports: ["Kayaking", "Rowing", "StandUpPaddling", "Canoeing"], unit: "km" },
+  { id: "yoga", label: "Yoga og pilates", sports: ["Yoga", "Pilates"], unit: "t" },
+  { id: "ballsport", label: "Ballsport", sports: ["Soccer", "Padel", "Tennis", "Badminton", "Squash", "Pickleball"], unit: "t" },
+];
+
+function sportBoard(b: (typeof SPORT_BOARDS)[number]) {
+  const value = (p: PersonStats) => {
+    const ws = p.ws.filter((w) => b.sports.includes(w.sport));
+    if (b.unit === "t") return Math.round((ws.reduce((s, w) => s + w.duration_min, 0) / 60) * 10) / 10;
+    const metres = ws.reduce((s, w) => s + (w.distance_m ?? 0), 0);
+    return b.unit === "m" ? Math.round(metres) : Math.round(metres / 100) / 10;
+  };
+  const fmt = (v: number) => (b.unit === "t" ? `${v.toLocaleString("nb-NO")} t` : b.unit === "m" ? `${v.toLocaleString("nb-NO")} m` : `${v.toLocaleString("nb-NO")} km`);
+  return { id: `sport-${b.id}`, label: b.label, value, fmt, tie: (p: PersonStats) => p.ws.filter((w) => b.sports.includes(w.sport)).length };
+}
+
+const ELEVATION = {
+  id: "sport-hoyde", label: "Høydemeter",
+  value: (p: PersonStats) => p.ws.reduce((s, w) => s + (w.elevation_m ?? 0), 0),
+  fmt: (v: number) => `${v.toLocaleString("nb-NO")} m`,
+  tie: (p: PersonStats) => p.minutes,
+};
+
+/** The per-sport boards that have data in this period. */
+export function sportBoards(stats: PersonStats[]) {
+  return [...SPORT_BOARDS.map(sportBoard), ELEVATION].filter((b) => stats.some((p) => b.value(p) > 0));
+}
+
+export type BoardId = string;
 
 export function rank(stats: PersonStats[], boardId: BoardId) {
-  const b = BOARDS.find((x) => x.id === boardId) ?? BOARDS[0];
+  const all = [...BOARDS, ...SPORT_BOARDS.map(sportBoard), ELEVATION];
+  const b = all.find((x) => x.id === boardId) ?? BOARDS[0];
   return [...stats]
     .sort((a, z) => b.value(z) - b.value(a) || b.tie(z) - b.tie(a))
     .map((p) => ({ p, value: b.value(p), text: b.fmt(b.value(p)) }));
