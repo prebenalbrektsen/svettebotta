@@ -1,0 +1,128 @@
+import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
+import { Icon } from "@/components/Icon";
+import { notFound } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
+import { CheckIn } from "@/components/CheckIn";
+import { RoleTag } from "@/components/RoleTag";
+import { CommentForm } from "@/components/CommentForm";
+import { requireUser } from "@/lib/auth";
+import { activeChallenge, annotate, checkInDeadline, WORKOUT_COLUMNS, type Workout } from "@/lib/challenge";
+import { one, query } from "@/lib/db";
+import { sportIcon, sportLabel } from "@/lib/sports";
+import { fmtKm } from "@/lib/stats";
+import { ago, formatMinutes, mondayOf, osloDate, relativeTime } from "@/lib/time";
+import { deleteComment, toggleKudos } from "../../actions";
+
+export default async function WorkoutPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  const { id } = await params;
+  const w = await one<Workout & { name: string; color: string }>(
+    `select ${WORKOUT_COLUMNS.replace(/\bid,/, "workouts.id,")}, u.name, u.color from workouts join users u on u.id = workouts.user_id where workouts.id = $1`,
+    [Number(id)],
+  );
+  if (!w) notFound();
+  const c = await activeChallenge();
+  // The status depends on the person's other workouts that day (one per day counts).
+  if (c) {
+    const week = await query<Workout>(
+      `select ${WORKOUT_COLUMNS} from workouts where user_id = $1
+         and started_at >= ($2::date)::timestamp at time zone 'Europe/Oslo' and started_at < ($2::date + 7)::timestamp at time zone 'Europe/Oslo'`,
+      [w.user_id, mondayOf(osloDate(new Date(w.started_at)))],
+    );
+    w.status = annotate(c, week).find((x) => x.id === w.id)?.status;
+  }
+  const [comments, kudosNames] = await Promise.all([
+    query<{ id: number; user_id: number; name: string; color: string; avatar_v: number | null; is_admin: boolean; body: string; created_at: Date }>(
+      "select c.id, c.user_id, u.name, u.color, extract(epoch from u.avatar_updated_at)::int as avatar_v, u.is_admin, c.body, c.created_at from comments c join users u on u.id = c.user_id where c.workout_id = $1 order by c.created_at",
+      [w.id],
+    ),
+    query<{ name: string }>("select u.name from kudos k join users u on u.id = k.user_id where k.workout_id = $1 order by k.created_at", [w.id]),
+  ]);
+  const mine = w.user_id === user.id;
+  const facts = [
+    ["Varighet", formatMinutes(w.duration_min)],
+    w.distance_m ? ["Distanse", `${fmtKm(w.distance_m / 1000)} km`] : null,
+    w.distance_m && ["Run", "TrailRun", "Walk", "Hike"].includes(w.sport)
+      ? ["Tempo", (() => { const pace = w.duration_min / (w.distance_m! / 1000); return `${Math.floor(pace)}:${String(Math.round((pace % 1) * 60)).padStart(2, "0")} /km`; })()]
+      : null,
+    w.avg_hr ? ["Snittpuls", `${w.avg_hr} bpm`] : null,
+    w.elevation_m ? ["Høydemeter", `${w.elevation_m} m`] : null,
+  ].filter(Boolean) as [string, string][];
+
+  return (
+    <div className="space-y-4 pt-2">
+      <BackLink />
+      <section>
+        <Link href={`/person/${w.user_id}`} className="font-bold" style={{ color: w.color }}>{w.name}</Link>
+        <h1 className="display mt-1 flex items-center gap-2 text-4xl"><Icon name={sportIcon(w.sport)} className="h-8 w-8 shrink-0" />{w.title || sportLabel(w.sport)}</h1>
+        <p className="mt-1 text-sm text-muted">{w.title ? `${sportLabel(w.sport)} · ` : ""}{relativeTime(new Date(w.started_at))} · {w.source === "strava" ? "fra Strava" : "logget manuelt"}</p>
+      </section>
+
+      {c && w.status && w.status !== "counts" && (
+        <section className={`rounded-2xl p-4 ${w.status === "pending" ? "bg-warn-soft text-warn" : w.status === "rejected" ? "bg-bad-soft text-bad" : "bg-line/60 text-muted"}`}>
+          <p className="font-bold">
+            {{
+              pending: `Venter på innsjekk – frist ${relativeTime(checkInDeadline(c, w))}`,
+              expired: "Ikke sjekket inn i tide – teller ikke",
+              short: `Under ${c.session_minutes} min – teller ikke som ukeøkt`,
+              sameday: `Teller ikke – maks ${c.max_per_day} økt${c.max_per_day === 1 ? "" : "er"} per dag`,
+              rejected: "Underkjent av kontrolløren – teller ikke",
+            }[w.status]}
+          </p>
+          {w.status === "pending" && mine && <p className="mt-1 text-sm">{c.proof_required ? "Legg ved et bilde for å sjekke inn." : "Trykk «Sjekk inn» så teller den."}</p>}
+        </section>
+      )}
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {facts.map(([label, value]) => (
+          <div key={label} className="card p-3">
+            <p className="text-xs font-bold tracking-wider text-muted uppercase">{label}</p>
+            <p className="display mt-1 text-2xl">{value}</p>
+          </div>
+        ))}
+      </section>
+
+      {w.has_proof && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/bilde/${w.id}`} alt="Dokumentasjon" className="w-full rounded-2xl border border-line" />
+      )}
+      {w.source === "strava" && w.strava_id && (
+        <a href={`https://www.strava.com/activities/${w.strava_id}`} target="_blank" className="inline-block text-sm font-semibold text-[#fc4c02]">Se økta på Strava →</a>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        {w.checked_in_at && (
+          <form action={toggleKudos.bind(null, w.id)}>
+            <button className={`btn ${w.kudos_by.includes(user.id) ? "btn-heat" : "btn-ghost"}`} disabled={mine}>
+              <Icon name="flame" className="h-4 w-4" />{w.kudos_by.length} kudos
+            </button>
+          </form>
+        )}
+        {kudosNames.length > 0 && <span className="text-sm text-muted">fra {kudosNames.map((k) => k.name).join(", ")}</span>}
+        {(mine || user.is_admin) && <CheckIn workoutId={w.id} checkedIn={!!w.checked_in_at} hasPhoto={w.has_proof} proofRequired={c?.proof_required ?? true} />}
+      </div>
+
+      <section className="card p-4">
+        <h2 className="mb-2 font-bold">Kommentarer</h2>
+        <ul className="mb-3 space-y-3">
+          {comments.map((cm) => (
+            <li key={cm.id} className="flex gap-2.5 text-sm">
+              <Avatar p={{ id: cm.user_id, name: cm.name, color: cm.color, avatar_v: cm.avatar_v }} size={28} />
+              <div className="min-w-0 flex-1">
+              <span className="font-bold" style={{ color: cm.color }}>{cm.name}</span>{cm.is_admin && <> <RoleTag /></>}{" "}
+              <span className="text-xs text-muted">{ago(new Date(cm.created_at))}</span>
+              <p className="whitespace-pre-wrap">{cm.body}</p>
+              {(cm.user_id === user.id || user.is_admin) && (
+                <form action={deleteComment.bind(null, cm.id)}><button className="text-xs text-muted underline">Slett</button></form>
+              )}
+              </div>
+            </li>
+          ))}
+          {!comments.length && <li className="text-sm text-muted">Ingen kommentarer ennå.</li>}
+        </ul>
+        <CommentForm workoutId={w.id} />
+      </section>
+    </div>
+  );
+}

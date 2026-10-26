@@ -1,0 +1,231 @@
+import { one, query } from "./db";
+import { addDays, fromOsloLocal, mondayOf, osloDate, weeksBetween } from "./time";
+
+export type Challenge = {
+  id: number;
+  name: string;
+  starts_on: string;
+  ends_on: string;
+  penalty_kr: number;
+  min_sessions: number;
+  session_minutes: number;
+  long_session_minutes: number | null;
+  vipps_info: string | null;
+  check_in_hours: number | null;
+  max_per_day: number | null;
+  proof_required: boolean;
+  description: string | null;
+};
+
+export type Workout = {
+  id: number;
+  user_id: number;
+  started_at: Date;
+  duration_min: number;
+  sport: string;
+  title: string | null;
+  distance_m: number | null;
+  elevation_m: number | null;
+  avg_hr: number | null;
+  source: string;
+  strava_id: string | null;
+  has_proof: boolean;
+  meets_task: boolean;
+  rejected: boolean;
+  kudos_by: number[];
+  comment_count: number;
+  checked_in_at: Date | null;
+  imported_at: Date;
+  status?: WorkoutStatus;
+};
+
+/**
+ * counts: one of the week's workouts · pending: waiting for check-in · expired: not checked in in time
+ * short: under the minimum length · sameday: a longer workout already counts that day · rejected: by admin
+ */
+export type WorkoutStatus = "counts" | "pending" | "expired" | "short" | "sameday" | "rejected";
+
+
+export type WeeklyTask = { id: number; week_start: string; title: string; description: string | null; auto_sports: string[] };
+export type FineStatus = "owed" | "claimed" | "paid" | "waived";
+export type Member = { id: number; name: string; color: string; strava_athlete_id: string | null; is_admin: boolean; joined_at: Date; avatar_v: number | null };
+
+export type WeekResult = {
+  week: string;
+  state: "future" | "running" | "done" | "before"; // before = the person had not joined yet
+  workouts: Workout[];
+  qualifying: number;
+  hasLong: boolean;
+  volumeMet: boolean;
+  taskMet: boolean;
+  passed: boolean;
+  minutes: number;
+  pending: number;
+  fine: FineStatus | null; // only set for finished, failed weeks
+};
+
+export const WORKOUT_COLUMNS = `id, user_id, started_at, duration_min, sport, title, distance_m, elevation_m, avg_hr,
+  source, strava_id::text, proof_image is not null as has_proof, meets_task, rejected, checked_in_at, imported_at,
+  array(select k.user_id from kudos k where k.workout_id = workouts.id) as kudos_by,
+  (select count(*) from comments m where m.workout_id = workouts.id)::int as comment_count`;
+
+export async function activeChallenge(): Promise<Challenge | null> {
+  // The newest challenge that has started, else the next one coming up.
+  return one<Challenge>(
+    `select * from challenges
+      order by (starts_on <= $1::date) desc, case when starts_on <= $1::date then starts_on end desc nulls last, starts_on asc
+      limit 1`,
+    [osloDate()],
+  );
+}
+
+/** The challenge's rules as short phrases, for chips and the rules recap. */
+export function ruleParts(c: Challenge): string[] {
+  const parts = [`${c.min_sessions} × ${c.session_minutes} min`];
+  if (c.long_session_minutes) parts.push(`eller 1 × ${c.long_session_minutes} min`);
+  if (c.max_per_day) parts.push(c.max_per_day === 1 ? "maks 1 økt per dag" : `maks ${c.max_per_day} økter per dag`);
+  parts.push(c.check_in_hours ? `sjekk inn innen ${c.check_in_hours} t` : "sjekk inn før uka er over");
+  if (c.proof_required) parts.push("bilde påkrevd");
+  parts.push(`bot ${c.penalty_kr} kr`);
+  return parts;
+}
+
+export function ruleText(c: Challenge): string {
+  return ruleParts(c).join(" · ");
+}
+
+/** The first week that counts for someone: everything if they joined before the start, else the first full week after joining. */
+export function firstCountedWeek(c: Challenge, joinedAt: Date): string {
+  const joined = osloDate(new Date(joinedAt));
+  if (joined <= c.starts_on) return mondayOf(c.starts_on);
+  const monday = mondayOf(joined);
+  return monday === joined ? monday : addDays(monday, 7);
+}
+
+/**
+ * Check in within the challenge's window after finishing (or after Strava delivered it, if it
+ * synced late), and always before the week closes on Sunday at midnight.
+ */
+export function checkInDeadline(c: Challenge, w: Pick<Workout, "started_at" | "duration_min" | "imported_at">): Date {
+  const weekEnd = fromOsloLocal(`${addDays(mondayOf(osloDate(new Date(w.started_at))), 7)}T00:00`).getTime();
+  if (!c.check_in_hours) return new Date(weekEnd);
+  const finished = new Date(w.started_at).getTime() + w.duration_min * 60000;
+  const base = Math.max(finished, new Date(w.imported_at).getTime());
+  return new Date(Math.min(base + c.check_in_hours * 3600000, weekEnd));
+}
+
+/**
+ * Sets each workout's status. Only `max_per_day` workouts per day count toward the week (the
+ * longest checked-in ones), so three workouts squeezed into Sunday don't complete a week.
+ * Pass one person's workouts.
+ */
+export function annotate(c: Challenge, workouts: Workout[], now = new Date()): Workout[] {
+  const countedPerDay = new Map<string, Set<Workout>>();
+  const candidates = workouts
+    .filter((w) => !w.rejected && w.duration_min >= c.session_minutes && w.checked_in_at)
+    .sort((a, b) => b.duration_min - a.duration_min || a.id - b.id);
+  for (const w of candidates) {
+    const day = osloDate(new Date(w.started_at));
+    const set = countedPerDay.get(day) ?? new Set<Workout>();
+    if (!c.max_per_day || set.size < c.max_per_day) set.add(w);
+    countedPerDay.set(day, set);
+  }
+  for (const w of workouts) {
+    if (w.rejected) w.status = "rejected";
+    else if (w.duration_min < c.session_minutes) w.status = "short";
+    else if (!w.checked_in_at) w.status = checkInDeadline(c, w) > now ? "pending" : "expired";
+    else w.status = countedPerDay.get(osloDate(new Date(w.started_at)))?.has(w) ? "counts" : "sameday";
+  }
+  return workouts;
+}
+
+export function meetsTask(w: Workout, task: WeeklyTask | undefined): boolean {
+  return !!task && (w.meets_task || task.auto_sports.includes(w.sport));
+}
+
+/** `workouts` = one person's workouts in that week. */
+export function evaluateWeek(c: Challenge, week: string, workouts: Workout[], task: WeeklyTask | undefined, today = osloDate()) {
+  annotate(c, workouts);
+  const counted = workouts.filter((w) => w.status === "counts");
+  const checkedIn = workouts.filter((w) => w.checked_in_at && !w.rejected);
+  const hasLong = !!c.long_session_minutes && checkedIn.some((w) => w.duration_min >= c.long_session_minutes!);
+  const volumeMet = counted.length >= c.min_sessions || hasLong;
+  // The task workout has to be a real one: checked in and long enough to count on its own.
+  const taskMet = !task || checkedIn.some((w) => w.duration_min >= c.session_minutes && meetsTask(w, task));
+  const state: WeekResult["state"] = week > today ? "future" : addDays(week, 6) < today ? "done" : "running";
+  return {
+    week,
+    state,
+    workouts,
+    qualifying: counted.length,
+    hasLong,
+    volumeMet,
+    taskMet,
+    passed: volumeMet && taskMet,
+    minutes: checkedIn.reduce((sum, w) => sum + w.duration_min, 0),
+    pending: workouts.filter((w) => w.status === "pending").length,
+  };
+}
+
+export type Board = {
+  challenge: Challenge;
+  weeks: string[];
+  currentWeek: string;
+  tasks: Map<string, WeeklyTask>;
+  members: (Member & {
+    results: WeekResult[];
+    owedKr: number;
+    claimedKr: number;
+    paidKr: number;
+    workouts: Workout[];
+  })[];
+};
+
+export async function loadBoard(c: Challenge): Promise<Board> {
+  const today = osloDate();
+  const weeks = weeksBetween(c.starts_on, c.ends_on);
+  const [members, workouts, tasks, fines] = await Promise.all([
+    query<Member>(
+      `select u.id, u.name, u.color, u.strava_athlete_id::text, u.is_admin, m.joined_at,
+              extract(epoch from u.avatar_updated_at)::int as avatar_v
+         from challenge_members m join users u on u.id = m.user_id
+        where m.challenge_id = $1 order by u.name`,
+      [c.id],
+    ),
+    query<Workout>(
+      `select ${WORKOUT_COLUMNS} from workouts
+        where user_id in (select user_id from challenge_members where challenge_id = $1)
+          and started_at >= ($2::date)::timestamp at time zone 'Europe/Oslo'
+          and started_at < ($3::date + 1)::timestamp at time zone 'Europe/Oslo'
+        order by started_at desc`,
+      [c.id, weeks[0], c.ends_on],
+    ),
+    query<WeeklyTask>("select id, week_start, title, description, auto_sports from weekly_tasks where challenge_id = $1", [c.id]),
+    query<{ user_id: number; week_start: string; status: FineStatus }>(
+      "select user_id, week_start, status from fines where challenge_id = $1",
+      [c.id],
+    ),
+  ]);
+  const taskMap = new Map(tasks.map((t) => [t.week_start, t]));
+  const fineMap = new Map(fines.map((f) => [`${f.user_id}:${f.week_start}`, f.status]));
+
+  return {
+    challenge: c,
+    weeks,
+    currentWeek: mondayOf(today),
+    tasks: taskMap,
+    members: members.map((m) => {
+      const mine = workouts.filter((w) => w.user_id === m.id);
+      const first = firstCountedWeek(c, m.joined_at);
+      const results: WeekResult[] = weeks.map((week) => {
+        const inWeek = mine.filter((w) => mondayOf(osloDate(w.started_at)) === week);
+        const r = evaluateWeek(c, week, inWeek, taskMap.get(week), today);
+        if (week < first) return { ...r, state: "before" as const, passed: false, fine: null };
+        const fine = r.state === "done" && !r.passed ? (fineMap.get(`${m.id}:${week}`) ?? "owed") : null;
+        return { ...r, fine };
+      });
+      const sum = (status: FineStatus) => results.filter((r) => r.fine === status).length * c.penalty_kr;
+      return { ...m, results, workouts: mine, owedKr: sum("owed"), claimedKr: sum("claimed"), paidKr: sum("paid") };
+    }),
+  };
+}

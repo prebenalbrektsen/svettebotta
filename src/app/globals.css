@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #14130f;
+  --color-paper: #f4f1ea;
+  --color-card: #fffdf8;
+  --color-line: #e2ddd1;
+  --color-muted: #6f6a5e;
+  --color-heat: #ff4d1c;
+  --color-heat-soft: #ffe3d8;
+  --color-ok: #1f8a4c;
+  --color-ok-soft: #dcf2e3;
+  --color-warn: #b7791f;
+  --color-warn-soft: #fbefd5;
+  --color-bad: #c42b1c;
+  --color-bad-soft: #fbe0dc;
+  --color-field: #ffffff;
+  --font-display: var(--font-display-family), ui-sans-serif, system-ui;
+  --font-sans: var(--font-body-family), ui-sans-serif, system-ui;
+}
+
+/* Dark mode follows the phone. Same names, so every component switches with it. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ink: #f2efe8;
+    --color-paper: #12110e;
+    --color-card: #1c1a16;
+    --color-field: #25221d;
+    --color-line: #353129;
+    --color-muted: #aaa496;
+    --color-heat: #ff5a2a;
+    --color-heat-soft: #3b1d12;
+    --color-ok: #43b871;
+    --color-ok-soft: #12301f;
+    --color-warn: #e3a94d;
+    --color-warn-soft: #33260f;
+    --color-bad: #e5483a;
+    --color-bad-soft: #3a1714;
+    color-scheme: dark;
+  }
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Chat: while the message box has focus, drop the tab bar and let the input sit on the keyboard. */
+html[data-typing] .tab-bar { display: none; }
+html[data-typing] .chat-input { bottom: 0; padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+
+/* In the components layer so Tailwind utilities (w-24, bg-ok …) can override them. */
+@layer components {
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+.btn:active { transform: scale(0.98); }
+.btn-heat { background: var(--color-heat); color: white; }
+.btn-ghost { background: transparent; color: var(--color-ink); border: 1px solid var(--color-line); }
+.btn-sm { min-height: 34px; padding: 0 0.75rem; font-size: 0.875rem; border-radius: 8px; }
+
+.field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-field);
+  color: var(--color-ink);
+  font-size: 16px;
+}
+.field:focus { outline: 2px solid var(--color-heat); outline-offset: 1px; }
+.label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--color-muted); margin-bottom: 0.3rem; }
+}

@@ -1,0 +1,140 @@
+import { logout } from "@/app/auth-actions";
+import { stravaDisconnect } from "../actions";
+import { AvatarUpload } from "@/components/AvatarUpload";
+import { StatTiles } from "@/components/StatTiles";
+import { one } from "@/lib/db";
+import { SyncButton } from "@/components/SyncButton";
+import { Pill, statusLabel, WeekProgress } from "@/components/WeekProgress";
+import { WorkoutRow } from "@/components/WorkoutRow";
+import { requireUser } from "@/lib/auth";
+import { activeChallenge, loadBoard, ruleParts } from "@/lib/challenge";
+import { computeStats } from "@/lib/stats";
+import { stravaConfigured } from "@/lib/strava";
+import { ago, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
+import { Icon } from "@/components/Icon";
+import { ActionForm } from "@/components/ActionForm";
+import { WatchGuide } from "@/components/WatchGuide";
+import { changePassword, renameMe } from "../actions";
+
+const STRAVA_MSG: Record<string, [string, string]> = {
+  ok: ["Strava er koblet til og øktene dine er hentet. 🎉", "text-ok bg-ok-soft"],
+  feil: ["Noe gikk galt med Strava-tilkoblingen. Prøv igjen.", "text-bad bg-bad-soft"],
+  tilgang: ["Du må gi tilgang til å lese aktiviteter for at det skal virke.", "text-bad bg-bad-soft"],
+  mangler: ["Strava er ikke satt opp i appen ennå – si fra til admin.", "text-warn bg-warn-soft"],
+};
+
+export default async function MePage({ searchParams }: { searchParams: Promise<{ strava?: string }> }) {
+  const user = await requireUser();
+  const { strava } = await searchParams;
+  const avatarV = (await one<{ v: number | null }>("select extract(epoch from avatar_updated_at)::int as v from users where id = $1", [user.id]))!.v;
+  const c = await activeChallenge();
+  const board = c ? await loadBoard(c) : null;
+  const me = board?.members.find((m) => m.id === user.id);
+  const stats = computeStats(me?.workouts ?? []);
+  const passed = me?.results.filter((r) => r.state === "done" && r.passed).length ?? 0;
+  const done = me?.results.filter((r) => r.state === "done").length ?? 0;
+
+  return (
+    <div className="space-y-5 pt-2">
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <AvatarUpload p={{ id: user.id, name: user.name, color: user.color, avatar_v: avatarV }} />
+          <h1 className="display line-clamp-2 text-4xl break-words sm:text-5xl">{user.name}</h1>
+        </div>
+      </div>
+      {strava && STRAVA_MSG[strava] && <p className={`rounded-xl px-4 py-3 font-semibold ${STRAVA_MSG[strava][1]}`}>{STRAVA_MSG[strava][0]}</p>}
+
+      <section className="card p-4">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-line/70"><Icon name="pulse" /></span>
+          <div className="flex-1">
+            <h2 className="font-bold">Strava</h2>
+            <p className="text-sm text-muted">
+              {user.strava_athlete_id
+                ? `Koblet til${user.strava_synced_at ? ` · hentet ${ago(new Date(user.strava_synced_at))}` : ""}`
+                : "Garmin, Apple Watch, Polar, Suunto og Wahoo kan synke til Strava – da kommer øktene hit av seg selv."}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {user.strava_athlete_id ? (
+            <>
+              <SyncButton />
+              <form action={stravaDisconnect}><button className="btn btn-ghost btn-sm">Koble fra</button></form>
+            </>
+          ) : stravaConfigured() ? (
+            <a href="/api/strava/connect" className="btn btn-sm bg-[#fc4c02] text-white">Koble til Strava</a>
+          ) : (
+            <p className="text-sm text-warn">Strava er ikke satt opp i appen ennå.</p>
+          )}
+        </div>
+      </section>
+
+      {c && me && (
+        <>
+          <section>
+            <h2 className="mb-2 font-bold">Din statistikk i {c.name}</h2>
+            <p className="mb-3 text-sm text-muted">{passed} av {done} ferdige uker i boks · lengste økt {stats.longest} min · betalt {me.paidKr} kr</p>
+            <StatTiles s={stats} />
+          </section>
+
+          <section className="card p-4">
+            <h2 className="mb-2 font-bold">Ukene dine</h2>
+            <ul className="divide-y divide-line">
+              {me.results.filter((r) => r.state !== "future").reverse().map((r) => {
+                const s = statusLabel(c, r);
+                return (
+                  <li key={r.week} className="flex items-center gap-3 py-2.5">
+                    <div className="w-24 shrink-0">
+                      <p className="font-semibold">Uke {isoWeekNumber(r.week)}</p>
+                      <p className="text-xs text-muted">{formatWeekRange(r.week)}</p>
+                    </div>
+                    <div className="flex-1"><WeekProgress c={c} r={r} small /></div>
+                    <Pill tone={s.tone}>{s.text}</Pill>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          <section className="card p-4">
+            <h2 className="font-bold">Øktene dine</h2>
+            {me.workouts.length ? (
+              <ul className="divide-y divide-line">
+                {me.workouts.map((w) => {
+                  const week = mondayOf(osloDate(new Date(w.started_at)));
+                  return <WorkoutRow key={w.id} w={w} me={user.id} task={board!.tasks.get(week)} c={c} canEdit={week === board!.currentWeek || user.is_admin} isAdmin={user.is_admin} />;
+                })}
+              </ul>
+            ) : (
+              <p className="py-3 text-sm text-muted">Ingen økter ennå.</p>
+            )}
+          </section>
+        </>
+      )}
+      {!user.strava_athlete_id && stravaConfigured() && <WatchGuide />}
+
+      {c && (
+        <section className="card p-4">
+          <h2 className="mb-2 font-bold">Reglene i {c.name}</h2>
+          <ul className="flex flex-wrap gap-1.5">
+            {ruleParts(c).map((r) => <li key={r} className="rounded-full bg-line/70 px-2.5 py-1 text-xs font-semibold">{r}</li>)}
+          </ul>
+        </section>
+      )}
+
+      <section className="card space-y-5 p-4">
+        <h2 className="font-bold">Innstillinger</h2>
+        <ActionForm action={renameMe} submit="Lagre navn" className="space-y-3">
+          <label className="block"><span className="label">Navn (vises for de andre)</span><input name="name" className="field" defaultValue={user.name} maxLength={40} required /></label>
+        </ActionForm>
+        <ActionForm action={changePassword} submit="Bytt passord" className="space-y-3">
+          <label className="block"><span className="label">Nåværende passord</span><input name="current" type="password" autoComplete="current-password" className="field" required /></label>
+          <label className="block"><span className="label">Nytt passord (minst 8 tegn)</span><input name="next" type="password" autoComplete="new-password" minLength={8} className="field" required /></label>
+        </ActionForm>
+      </section>
+
+      <form action={logout} className="pb-4 text-center"><button className="text-sm font-semibold text-muted underline">Logg ut</button></form>
+    </div>
+  );
+}
