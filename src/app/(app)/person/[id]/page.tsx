@@ -1,3 +1,5 @@
+import { Badges, badgesFor, Records, WeeklyChart } from "@/components/Profile";
+import { firstFinishCounts, personStats } from "@/lib/leaderboard";
 import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
@@ -19,6 +21,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const p = board.members.find((m) => m.id === Number(id));
   if (!p) notFound();
   const stats = computeStats(p.workouts);
+  const pStats = (await personStats(c, board, "alt")).find((x) => x.m.id === p.id)!;
+  const firsts = await firstFinishCounts(c);
   const passed = p.results.filter((r) => r.state === "done" && r.passed).length;
   const done = p.results.filter((r) => r.state === "done").length;
 
@@ -34,7 +38,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
       {stats.sessions > 0 ? (
-        <StatTiles s={stats} />
+        <>
+          <Records p={pStats} />
+          <WeeklyChart c={c} m={p} />
+          <Badges badges={badgesFor(pStats, c, firsts.get(p.id) ?? 0)} />
+          <StatTiles s={stats} />
+        </>
       ) : (
         <p className="card p-4 text-sm text-muted">Ingen innsjekkede økter ennå.{p.results.some((r) => r.state === "before") ? " Ukene før vedkommende ble med teller ikke." : ""}</p>
       )}

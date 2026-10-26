@@ -2,23 +2,25 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { StatTiles } from "@/components/StatTiles";
 import { requireUser } from "@/lib/auth";
+import { BOARDS, personStats, rank, type BoardId, type Period } from "@/lib/leaderboard";
 import { activeChallenge, loadBoard } from "@/lib/challenge";
 import { Icon } from "@/components/Icon";
 import { sportIcon, sportLabel } from "@/lib/sports";
 import { computeStats, fmtHours, fmtKm } from "@/lib/stats";
 import { addDays, isoWeekNumber, osloDate } from "@/lib/time";
 
-export default async function StatsPage() {
-  await requireUser();
+export default async function StatsPage({ searchParams }: { searchParams: Promise<{ tavle?: string; periode?: string }> }) {
+  const user = await requireUser();
+  const { tavle, periode } = await searchParams;
   const c = await activeChallenge();
   if (!c) return <p className="pt-6 text-muted">Ingen utfordring ennå.</p>;
   const board = await loadBoard(c);
+  const boardId = (BOARDS.some((b) => b.id === tavle) ? tavle : "uker") as BoardId;
+  const period: Period = periode === "uke" ? "uke" : "alt";
+  const ranking = rank(await personStats(c, board, period), boardId);
+  const best = Math.max(1, ...ranking.map((r) => r.value));
+  const link = (t: string, p: string) => `?tavle=${t}&periode=${p}`;
   const all = computeStats(board.members.flatMap((m) => m.workouts));
-  const people = board.members
-    .map((m) => ({ m, s: computeStats(m.workouts), passed: m.results.filter((r) => r.state !== "future" && r.passed).length }))
-    // The challenge is about weeks in the bag; minutes only break ties.
-    .sort((a, b) => b.passed - a.passed || b.s.minutes - a.s.minutes);
-  const maxPassed = Math.max(1, ...people.map((p) => p.passed));
   const doneWeeks = board.weeks.filter((w) => addDays(w, 6) < osloDate()).length;
   const teamWeekly = board.weeks.map((w, i) => ({ w, min: board.members.reduce((s, m) => s + m.results[i].minutes, 0) }));
   const maxWeek = Math.max(1, ...teamWeekly.map((t) => t.min));
@@ -32,20 +34,31 @@ export default async function StatsPage() {
       <StatTiles s={all} />
 
       <section className="card p-4">
-        <h2 className="mb-3 font-bold">Tavla – flest uker i boks</h2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="font-bold">Tavla</h2>
+          <div className="flex rounded-full bg-line/60 p-0.5 text-xs font-semibold">
+            <Link href={link(boardId, "uke")} className={`rounded-full px-3 py-1.5 ${period === "uke" ? "bg-ink text-paper" : "text-muted"}`}>Denne uka</Link>
+            <Link href={link(boardId, "alt")} className={`rounded-full px-3 py-1.5 ${period === "alt" ? "bg-ink text-paper" : "text-muted"}`}>Hele utfordringen</Link>
+          </div>
+        </div>
+        <nav className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1" aria-label="Velg tavle">
+          {BOARDS.filter((b) => period === "alt" || b.id !== "streak").map((b) => (
+            <Link key={b.id} href={link(b.id, period)} className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold ${boardId === b.id ? "border-ink bg-ink text-paper" : "border-line"}`}>{b.label}</Link>
+          ))}
+        </nav>
         <ol className="space-y-3">
-          {people.map(({ m, s, passed }, i) => (
-            <li key={m.id}>
+          {ranking.map(({ p, value, text }, i) => (
+            <li key={p.m.id} className={p.m.id === user.id ? "-mx-2 rounded-xl bg-heat-soft/60 px-2 py-1" : ""}>
               <div className="flex items-center justify-between gap-2 text-sm">
-                <Link href={`/person/${m.id}`} className="flex min-w-0 items-center gap-2 font-semibold">
-                  <span className="w-5 shrink-0 text-right text-muted">{i + 1}.</span><Avatar p={m} size={24} /><span className="truncate">{m.name}</span>
+                <Link href={`/person/${p.m.id}`} className="flex min-w-0 items-center gap-2 font-semibold">
+                  <span className="w-6 shrink-0 text-right">{value > 0 && i < 3 ? ["🥇", "🥈", "🥉"][i] : <span className="text-muted">{i + 1}.</span>}</span>
+                  <Avatar p={p.m} size={24} /><span className="truncate">{p.m.name}</span>
                 </Link>
-                <span className="shrink-0 font-semibold">{passed} {passed === 1 ? "uke" : "uker"}</span>
+                <span className="shrink-0 font-semibold">{text}</span>
               </div>
-              <div className="mt-1 ml-7 h-2.5 rounded-full bg-line">
-                <div className="h-full rounded-full" style={{ width: `${(passed / maxPassed) * 100}%`, background: m.color }} />
+              <div className="mt-1 ml-8 h-2 rounded-full bg-line">
+                <div className="h-full rounded-full" style={{ width: `${(value / best) * 100}%`, background: p.m.color }} />
               </div>
-              <p className="mt-0.5 ml-7 text-xs text-muted">{fmtHours(s.minutes)} t · {s.sessions} økter{s.runKm > 0 ? ` · ${fmtKm(s.runKm)} km løp` : ""} · {m.paidKr + m.owedKr + m.claimedKr} kr i bøter</p>
             </li>
           ))}
         </ol>

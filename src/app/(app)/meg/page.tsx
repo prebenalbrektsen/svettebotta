@@ -1,3 +1,5 @@
+import { Badges, badgesFor, Records, WeeklyChart } from "@/components/Profile";
+import { firstFinishCounts, personStats } from "@/lib/leaderboard";
 import { ConnectWithStrava, PoweredByStrava } from "@/components/StravaBrand";
 import { logout } from "@/app/auth-actions";
 import { stravaDisconnect } from "../actions";
@@ -35,6 +37,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const board = c ? await loadBoard(c) : null;
   const me = board?.members.find((m) => m.id === user.id);
   const stats = computeStats(me?.workouts ?? []);
+  const myStats = c && board && me ? (await personStats(c, board, "alt")).find((x) => x.m.id === me.id) ?? null : null;
+  const firsts = c ? await firstFinishCounts(c) : new Map<number, number>();
   const passed = me?.results.filter((r) => r.state === "done" && r.passed).length ?? 0;
   const done = me?.results.filter((r) => r.state === "done").length ?? 0;
 
@@ -78,7 +82,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       {c && me && (
         <>
           <section>
-            <h2 className="mb-2 font-bold">Din statistikk i {c.name}</h2>
+            {myStats && (
+              <div className="mb-5 space-y-4">
+                <Records p={myStats} />
+                <WeeklyChart c={c} m={me} />
+                <Badges badges={badgesFor(myStats, c, firsts.get(me.id) ?? 0)} />
+              </div>
+            )}
+            <h2 className="mb-2 font-bold">Totalt i {c.name}</h2>
             <p className="mb-3 text-sm text-muted">{passed} av {done} ferdige uker i boks · lengste økt {stats.longest} min · betalt {me.paidKr} kr</p>
             <StatTiles s={stats} />
           </section>

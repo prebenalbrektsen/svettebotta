@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     [(await one<{ chat_seen_at: Date }>("select chat_seen_at from users where id = $1", [user.id]))!.chat_seen_at, user.id],
   );
   return (
-    <div className="mx-auto min-h-dvh max-w-3xl pb-24 sm:pb-10">
+    <div className="mx-auto min-h-dvh max-w-3xl pb-[calc(96px+env(safe-area-inset-bottom))] sm:pb-10">
       <header className="flex items-center justify-between px-4 pt-4 pb-2">
         <Link href="/"><Logo /></Link>
         <div className="hidden sm:block"><NavLinks isAdmin={user.is_admin} unread={unread!.n} onStrava={!!user.strava_athlete_id} adminBadge={pendingUsers} /></div>

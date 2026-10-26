@@ -1,6 +1,6 @@
 import { InstallPrompt } from "@/components/InstallPrompt";
 import Link from "next/link";
-import { Pill, statusLabel, WeekProgress } from "@/components/WeekProgress";
+import { statusLabel } from "@/components/WeekProgress";
 import { ClaimPaid } from "@/components/ClaimPaid";
 import { WorkoutRow } from "@/components/WorkoutRow";
 import { requireUser } from "@/lib/auth";
@@ -8,9 +8,11 @@ import { Avatar } from "@/components/Avatar";
 import { JoinCard } from "@/components/JoinCard";
 import { RoleTag } from "@/components/RoleTag";
 import { activeChallenge, loadBoard, mayJoin, ruleParts, type Challenge } from "@/lib/challenge";
+import { DayDots, DayLetters, Highlight, ProgressRing } from "@/components/WeekDashboard";
+import { firstToFinish, personStats, rank } from "@/lib/leaderboard";
 import { query } from "@/lib/db";
 import { sportLabel } from "@/lib/sports";
-import { addDays, formatDay, formatWeekRange, fromOsloLocal, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
+import { addDays, formatDay, formatMinutes, formatWeekRange, fromOsloLocal, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
 
 function timeLeft(week: string): string {
   const ms = fromOsloLocal(`${addDays(week, 7)}T00:00`).getTime() - Date.now();
@@ -68,25 +70,32 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
     .sort((a, b) => +new Date(b.w.started_at) - +new Date(a.w.started_at))
     .slice(0, 5);
 
-  return (
-    <div className="space-y-5 pt-2">
-      {logget && <p className="rounded-xl bg-ok-soft px-4 py-3 font-semibold text-ok">Økta er registrert. Sterkt! 💪</p>}
+  // The week's leaderboard and highlights.
+  const weekStats = await personStats(c, board, "uke");
+  const topMinutes = rank(weekStats, "minutter").filter((x) => x.value > 0).slice(0, 3);
+  const longest = weekStats.filter((p) => p.longest).sort((a, b) => b.longest!.duration_min - a.longest!.duration_min)[0];
+  const mostKudos = rank(weekStats, "kudos").find((x) => x.value > 0);
+  const firstId = await firstToFinish(c, week);
+  const first = board.members.find((m) => m.id === firstId);
 
-      <section>
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm font-semibold text-muted">{c.name}</p>
-          <p className="text-sm font-semibold text-muted">{weekIndex + 1}/{board.weeks.length} uker</p>
-        </div>
-        <div className="mt-1 h-1.5 rounded-full bg-line"><div className="h-full rounded-full bg-ink" style={{ width: `${((weekIndex + 1) / board.weeks.length) * 100}%` }} /></div>
-        <h1 className="display mt-3 text-6xl">Uke {isoWeekNumber(week)}</h1>
-        <p className="mt-2 text-muted">
-          {formatWeekRange(week)} ·{" "}
-          {over ? "Utfordringen er ferdig 🎉" : !started ? `Starter ${formatDay(c.starts_on)}` : <strong className="text-ink">{timeLeft(week)}</strong>}
-        </p>
-        <ul className="mt-3 flex flex-wrap gap-1.5">
-          {ruleParts(c).map((r) => <li key={r} className="rounded-full bg-line/70 px-2.5 py-1 text-xs font-semibold">{r}</li>)}
-        </ul>
-      </section>
+  // «Til deg»: kudos and comments others gave on your workouts since you last looked.
+  const toYou = (await query<{ kudos: number; comments: number }>(
+    `select (select count(*)::int from kudos k join workouts w on w.id = k.workout_id
+              where w.user_id = $1 and k.user_id <> $1 and k.created_at > u.activity_seen_at) as kudos,
+            (select count(*)::int from comments m join workouts w on w.id = m.workout_id
+              where w.user_id = $1 and m.user_id <> $1 and m.created_at > u.activity_seen_at) as comments
+       from users u where u.id = $1`,
+    [user.id],
+  ))[0];
+
+  const ranked = board.members
+    .map((m) => ({ m, r: m.results[weekIndex] }))
+    .sort((a, b) => Number(b.r.passed) - Number(a.r.passed) || b.r.qualifying - a.r.qualifying || b.r.minutes - a.r.minutes);
+  const medal = ["🥇", "🥈", "🥉"];
+
+  return (
+    <div className="space-y-4 pt-2">
+      {logget && <p className="rounded-xl bg-ok-soft px-4 py-3 font-semibold text-ok">Økta er registrert. Sterkt! 💪</p>}
 
       {pendingUsers > 0 && (
         <Link href="/admin?fane=deltakere" className="block rounded-2xl border-2 border-heat bg-card p-4">
@@ -95,36 +104,57 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
         </Link>
       )}
 
-      <InstallPrompt variant="banner" />
-
-      {!me && (allowed
-        ? <JoinCard c={c} joined={false} count={board.members.length} />
-        : <p className="card p-4 text-sm text-muted">Du er ikke med i {c.name}. Vil du være med, si fra til kontrolløren.</p>)}
-
-      {myPending > 0 && (
-        <Link href="/logg" className="block rounded-2xl bg-warn-soft p-4 text-warn">
-          <p className="font-bold">{myPending === 1 ? "1 økt venter på innsjekk" : `${myPending} økter venter på innsjekk`}</p>
-          <p className="text-sm">Sjekk inn{c.proof_required ? " med bilde" : ""}{c.check_in_hours ? ` innen ${c.check_in_hours} timer` : ""}, ellers teller den ikke →</p>
-        </Link>
-      )}
-
-      {me && myWeek && (
-        <section className="card p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-bold">Din uke</h2>
-            <Pill tone={statusLabel(c, myWeek).tone}>{statusLabel(c, myWeek).text}</Pill>
-          </div>
-          <div className="mt-3"><WeekProgress c={c} r={myWeek} /></div>
-          <p className="mt-2 text-sm text-muted">
-            {myWeek.state === "before"
-              ? "Du er med fra neste uke."
-              : `${Math.min(myWeek.qualifying, c.min_sessions)} av ${c.min_sessions} økter sjekket inn${myWeek.hasLong ? ` (langøkt teller ×${c.long_session_counts})` : ""}`}
-            {task && myWeek.state !== "before" && (myWeek.taskMet ? " · ukeskrav ✓" : " · ukeskrav mangler")}
+      <section>
+        <div className="flex items-baseline justify-between gap-3 text-sm font-semibold text-muted">
+          <span className="truncate">{c.name}</span>
+          <span className="shrink-0">{weekIndex + 1}/{board.weeks.length} uker</span>
+        </div>
+        <div className="mt-1 h-1.5 rounded-full bg-line"><div className="h-full rounded-full bg-ink" style={{ width: `${((weekIndex + 1) / board.weeks.length) * 100}%` }} /></div>
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <h1 className="display text-5xl">Uke {isoWeekNumber(week)}</h1>
+          <p className="pb-1 text-right text-sm text-muted">
+            {formatWeekRange(week)}<br />
+            {over ? "Ferdig 🎉" : !started ? `Starter ${formatDay(c.starts_on)}` : <strong className="text-ink">{timeLeft(week)}</strong>}
           </p>
-          {myWeek.state !== "done" && myWeek.state !== "before" && !myWeek.passed && (
-            <Link href="/logg" className="btn btn-heat mt-4 w-full">{user.strava_athlete_id ? "Se øktene dine" : "Logg en økt"}</Link>
-          )}
+        </div>
+        <details className="mt-2">
+          <summary className="cursor-pointer text-sm font-semibold text-muted">Reglene</summary>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {ruleParts(c).map((r) => <li key={r} className="rounded-full bg-line/70 px-2.5 py-1 text-xs font-semibold">{r}</li>)}
+          </ul>
+        </details>
+      </section>
+
+      {me && myWeek && myWeek.state !== "before" && (
+        <section className="card p-4">
+          <div className="flex items-center gap-4">
+            <ProgressRing c={c} r={myWeek} />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold tracking-wider text-muted uppercase">Din uke</p>
+              <p className="display mt-0.5 text-2xl">
+                {myWeek.passed ? "I boks!" : myWeek.volumeMet ? "Mangler ukeskravet" : `${Math.max(0, c.min_sessions - myWeek.qualifying)} økt${c.min_sessions - myWeek.qualifying === 1 ? "" : "er"} igjen`}
+              </p>
+              <div className="mt-2"><DayDots c={c} r={myWeek} week={week} /></div>
+            </div>
+          </div>
+          {myWeek.hasLong && <p className="mt-2 text-xs text-muted">Langøkt teller ×{c.long_session_counts}.</p>}
+          {task && <p className="mt-1 text-xs text-muted">Ukeskrav «{task.title}»: {myWeek.taskMet ? "✓ oppfylt" : "ikke ennå"}</p>}
+          {myPending > 0 ? (
+            <Link href="/logg" className="btn btn-heat mt-3 w-full">Sjekk inn {myPending === 1 ? "økta" : `${myPending} økter`} {c.check_in_hours ? `(innen ${c.check_in_hours} t)` : ""}</Link>
+          ) : myWeek.state !== "done" && !myWeek.passed ? (
+            <Link href="/logg" className="btn btn-heat mt-3 w-full">{user.strava_athlete_id ? "Se øktene dine" : "Logg en økt"}</Link>
+          ) : null}
         </section>
+      )}
+      {me && myWeek?.state === "before" && <p className="card p-4 text-sm text-muted">Du er med fra neste uke. Øktene du gjør nå kommer med i statistikken.</p>}
+
+      {toYou && toYou.kudos + toYou.comments > 0 && (
+        <Link href="/til-deg" className="flex items-center justify-between gap-3 rounded-2xl bg-heat-soft p-4">
+          <span className="font-bold">
+            Til deg: {toYou.kudos > 0 && `${toYou.kudos} 🔥`}{toYou.kudos > 0 && toYou.comments > 0 && " og "}{toYou.comments > 0 && `${toYou.comments} ${toYou.comments === 1 ? "kommentar" : "kommentarer"}`}
+          </span>
+          <span className="text-sm font-semibold text-muted">Se →</span>
+        </Link>
       )}
 
       {owedWeeks.length > 0 && (
@@ -145,53 +175,74 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
         </section>
       )}
       {me && me.claimedKr > 0 && (
-        <p className="rounded-xl bg-warn-soft px-4 py-3 text-sm font-semibold text-warn">{me.claimedKr} kr meldt betalt – venter på at admin bekrefter.</p>
+        <p className="rounded-xl bg-warn-soft px-4 py-3 text-sm font-semibold text-warn">{me.claimedKr} kr meldt betalt – venter på at kontrolløren bekrefter.</p>
       )}
 
+      {!me && (allowed
+        ? <JoinCard c={c} joined={false} count={board.members.length} />
+        : <p className="card p-4 text-sm text-muted">Du er ikke med i {c.name}. Vil du være med, si fra til kontrolløren.</p>)}
+
       {task && (
-        <section className="rounded-2xl bg-ink p-4 text-paper">
+        <section className="rounded-2xl bg-ink px-4 py-3 text-paper">
           <p className="text-xs font-bold tracking-wider text-heat uppercase">Ukas ekstrakrav</p>
-          <p className="display mt-1 text-2xl">{task.title}</p>
-          {task.description && <p className="mt-1 text-sm">{task.description}</p>}
-          <p className="mt-2 text-sm">
-            Minst én av øktene som teller må oppfylle dette.
-            {task.auto_sports.length > 0 && ` ${task.auto_sports.map(sportLabel).join(", ")} teller automatisk.`}
+          <p className="display mt-0.5 text-xl">{task.title}</p>
+          <p className="mt-1 text-sm">
+            {task.description ? `${task.description} ` : ""}
+            {task.auto_sports.length > 0 && `${task.auto_sports.map(sportLabel).join(", ")} teller automatisk.`}
           </p>
         </section>
       )}
 
       <section className="card p-4">
-        <h2 className="mb-2 font-bold">Alle denne uka</h2>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="font-bold">Uka på et blikk</h2>
+          <DayLetters week={week} />
+        </div>
         <ul className="divide-y divide-line">
-          {board.members
-            .map((m) => ({ m, r: m.results[weekIndex] }))
-            .sort((a, b) => Number(b.r.passed) - Number(a.r.passed) || b.r.qualifying - a.r.qualifying || b.r.minutes - a.r.minutes)
-            .map(({ m, r }) => {
-              const s = statusLabel(c, r);
-              return (
-                <li key={m.id} className="flex items-center gap-3 py-2.5">
-                  <Avatar p={m} size={32} />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex min-w-0 items-center gap-1.5 font-semibold"><Link href={`/person/${m.id}`} className="truncate">{m.name}</Link>{m.is_admin && <RoleTag />}</p>
-                    <WeekProgress c={c} r={r} small />
-                  </div>
-                  <Pill tone={s.tone}>{s.text}</Pill>
-                </li>
-              );
-            })}
+          {ranked.map(({ m, r }) => {
+            const st = statusLabel(c, r);
+            return (
+              <li key={m.id} className="flex items-center gap-2.5 py-2">
+                <Avatar p={m} size={28} />
+                <Link href={`/person/${m.id}`} className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold"><span className="truncate">{m.name.split(" ")[0]}</span>{m.is_admin && <RoleTag compact />}</span>
+                  <span className={`text-xs font-semibold ${st.tone === "ok" ? "text-ok" : st.tone === "bad" ? "text-bad" : st.tone === "warn" ? "text-warn" : "text-muted"}`}>{st.text}</span>
+                </Link>
+                <DayDots c={c} r={r} week={week} size="sm" />
+              </li>
+            );
+          })}
         </ul>
+        <p className="mt-2 text-[11px] text-muted">Fylt prikk = økt som teller · «2» = langøkt · ring = venter på innsjekk</p>
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <div className="card p-4">
-          <p className="text-xs font-bold tracking-wider text-muted uppercase">Betalt inn</p>
-          <p className="display mt-1 text-4xl">{potPaid} kr</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-xs font-bold tracking-wider text-muted uppercase">Ikke betalt ennå</p>
-          <p className={`display mt-1 text-4xl ${potOpen ? "text-bad" : ""}`}>{potOpen} kr</p>
-        </div>
-      </section>
+      {(topMinutes.length > 0 || first || longest) && (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-bold">Ukas tavle</h2>
+            <Link href="/statistikk" className="text-sm font-semibold text-muted">Alle tavler →</Link>
+          </div>
+          {topMinutes.length > 0 && (
+            <ol className="card divide-y divide-line px-4">
+              {topMinutes.map(({ p, text }, i) => (
+                <li key={p.m.id} className="flex items-center gap-3 py-2.5">
+                  <span className="w-6 text-lg">{medal[i]}</span>
+                  <Avatar p={p.m} size={28} />
+                  <span className="min-w-0 flex-1 truncate font-semibold">{p.m.name.split(" ")[0]}</span>
+                  <span className="font-semibold">{text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(105px,1fr))] gap-2">
+            {first && <Highlight label="Først i boks" who={first.name.split(" ")[0]} value="🏁 uka er i boks" href={`/person/${first.id}`} />}
+            {longest?.longest && <Highlight label="Lengste økt" who={longest.m.name.split(" ")[0]} value={`${formatMinutes(longest.longest.duration_min)} ${sportLabel(longest.longest.sport).toLowerCase()}`} href={`/okt/${longest.longest.id}`} />}
+            {mostKudos && <Highlight label="Mest heia på" who={mostKudos.p.m.name.split(" ")[0]} value={mostKudos.text} href={`/person/${mostKudos.p.m.id}`} />}
+          </div>
+        </section>
+      )}
+
+      <InstallPrompt variant="banner" />
 
       {upcoming.map((u) => <JoinCard key={u.id} c={u} joined={u.joined} count={u.count} />)}
 
@@ -199,16 +250,27 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
         <h2 className="font-bold">Siste økter</h2>
         {feed.length ? (
           <>
-          <ul className="divide-y divide-line">
-            {feed.map(({ w, m }) => (
-              <WorkoutRow key={w.id} w={w} who={m} me={user.id} c={c} task={board.tasks.get(mondayOf(osloDate(new Date(w.started_at))))} />
-            ))}
-          </ul>
-          <Link href="/siste" className="btn btn-ghost mt-2 w-full">Se alle økter</Link>
+            <ul className="divide-y divide-line">
+              {feed.map(({ w, m }) => (
+                <WorkoutRow key={w.id} w={w} who={m} me={user.id} c={c} task={board.tasks.get(mondayOf(osloDate(new Date(w.started_at))))} />
+              ))}
+            </ul>
+            <Link href="/siste" className="btn btn-ghost mt-2 w-full">Se alle økter</Link>
           </>
         ) : (
           <p className="py-4 text-sm text-muted">Ingen økter ennå. Hvem blir først?</p>
         )}
+      </section>
+
+      <section className="grid grid-cols-2 gap-3">
+        <div className="card p-4">
+          <p className="text-xs font-bold tracking-wider text-muted uppercase">Betalt inn</p>
+          <p className="display mt-1 text-3xl">{potPaid} kr</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs font-bold tracking-wider text-muted uppercase">Ikke betalt ennå</p>
+          <p className={`display mt-1 text-3xl ${potOpen ? "text-bad" : ""}`}>{potOpen} kr</p>
+        </div>
       </section>
     </div>
   );
