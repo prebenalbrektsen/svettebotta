@@ -195,25 +195,49 @@ export async function subscribeWebhook(): Promise<{ ok: boolean; message: string
 
 type WebhookEvent = { object_type: "activity" | "athlete"; aspect_type: "create" | "update" | "delete"; object_id: number; owner_id: number; updates?: Record<string, string> };
 
+async function logEvent(e: WebhookEvent, userId: number | null, result: string): Promise<void> {
+  await query(
+    "insert into strava_events (owner_id, user_id, aspect, object_type, object_id, result) values ($1, $2, $3, $4, $5, $6)",
+    [e.owner_id, userId, e.aspect_type, e.object_type, e.object_id, result],
+  ).catch(() => {});
+  await query("delete from strava_events where id not in (select id from strava_events order by created_at desc limit 200)").catch(() => {});
+}
+
 export async function handleWebhookEvent(e: WebhookEvent): Promise<void> {
+  try {
+    await handleWebhookEventInner(e);
+  } catch (err) {
+    await logEvent(e, null, `feil: ${(err as Error).message.slice(0, 200)}`);
+    throw err;
+  }
+}
+
+async function handleWebhookEventInner(e: WebhookEvent): Promise<void> {
   const user = await one<{ id: number }>("select id from users where strava_athlete_id = $1", [e.owner_id]);
-  if (!user) return;
+  // Strava still thinks this person is connected, but the app never got their tokens
+  // (typically a connect that came back in another browser). They need to connect again.
+  if (!user) return logEvent(e, null, "ukjent Strava-konto – personen må koble til Strava på nytt i appen");
   if (e.object_type === "athlete") {
     // The person revoked access on strava.com.
     if (e.updates?.authorized === "false") {
       await query("update users set strava_athlete_id = null, strava_access_token = null, strava_refresh_token = null, strava_expires_at = null where id = $1", [user.id]);
+      return logEvent(e, user.id, "koblet fra på strava.com");
     }
-    return;
+    return logEvent(e, user.id, "profilendring – ignorert");
   }
   if (e.aspect_type === "delete") {
     // Deleted on Strava: drop it, unless it was already checked in (then the photo is the proof).
-    await query("delete from workouts where strava_id = $1 and checked_in_at is null", [e.object_id]);
-    return;
+    const gone = await query("delete from workouts where strava_id = $1 and checked_in_at is null returning 1", [e.object_id]);
+    return logEvent(e, user.id, gone.length ? "slettet økta" : "slettet på Strava – beholdt (allerede sjekket inn)");
   }
   const token = await accessToken(user.id);
-  if (!token) return;
+  if (!token) return logEvent(e, user.id, "mangler tilgang – personen må koble til Strava på nytt");
   const res = await fetch(`${API}/activities/${e.object_id}`, { headers: { authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`Strava activity ${res.status}`);
-  if (await importActivity(user.id, (await res.json()) as Activity)) await announceWeek(user.id);
+  if (!res.ok) return logEvent(e, user.id, `Strava svarte ${res.status} på henting av økta`);
+  const a = (await res.json()) as Activity;
+  const added = await importActivity(user.id, a);
+  if (added) await announceWeek(user.id);
   await query("update users set strava_synced_at = now() where id = $1", [user.id]);
+  const minutes = Math.round((a.moving_time || a.elapsed_time) / 60);
+  await logEvent(e, user.id, added ? `hentet: ${sportLabel(a.sport_type)} ${minutes} min` : minutes < 1 ? "for kort – ignorert" : `oppdatert: ${sportLabel(a.sport_type)} ${minutes} min`);
 }

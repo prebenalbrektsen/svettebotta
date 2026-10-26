@@ -531,3 +531,11 @@ export async function applyJokers(week: string): Promise<void> {
   ]);
   revalidatePath("/", "layout");
 }
+
+/** Admin: fetch one person's Strava workouts now (troubleshooting «it never came in»). */
+export async function adminSyncStrava(userId: number): Promise<void> {
+  await requireAdmin();
+  const c = await activeChallenge();
+  await syncStrava(userId, new Date(`${c ? addDays(c.starts_on, -7) : osloDate()}T00:00:00Z`)).catch((e) => console.error("[admin sync]", e));
+  revalidatePath("/admin");
+}

@@ -9,8 +9,9 @@ import { activeChallenge, loadBoard, type Challenge } from "@/lib/challenge";
 import { query } from "@/lib/db";
 import { stravaConfigured, webhookStatus } from "@/lib/strava";
 import { ActivateWebhook } from "@/components/ActivateWebhook";
-import { addDays, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
-import { activateStravaWebhook, approveUser, removeInvite, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
+import { addDays, ago, formatWeekRange, isoWeekNumber, mondayOf, osloDate, relativeTime } from "@/lib/time";
+import { sportLabel } from "@/lib/sports";
+import { activateStravaWebhook, adminSyncStrava, approveUser, removeInvite, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
 
 const TABS = [
   { id: "boter", label: "Bøter" },
@@ -117,6 +118,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Remember it, so the background Strava check can relax (see lib/autosync.ts).
   if (webhook) await query("insert into settings (key, value) values ('strava_webhook', '1') on conflict (key) do nothing");
   const connected = users.filter((u) => u.strava).length;
+  // Strava troubleshooting: everyone's connection, and the latest notices from Strava.
+  const stravaPeople = fane === "regler" ? await query<{ id: number; name: string; connected: boolean; synced: Date | null; last: Date | null; last_sport: string | null }>(
+    `select u.id, u.name, u.strava_refresh_token is not null as connected, u.strava_synced_at as synced,
+            w.started_at as last, w.sport as last_sport
+       from users u
+       left join lateral (select started_at, sport from workouts where user_id = u.id and source = 'strava' order by started_at desc limit 1) w on true
+      where u.approved order by u.name`,
+  ) : [];
+  const stravaEvents = fane === "regler" ? await query<{ created_at: Date; owner_id: string; name: string | null; aspect: string; result: string }>(
+    `select e.created_at, e.owner_id::text, u.name, e.aspect, e.result from strava_events e left join users u on u.id = e.user_id
+      order by e.created_at desc limit 12`,
+  ) : [];
   const tab = TABS.some((t) => t.id === fane) ? fane! : pending.length ? "deltakere" : claimedCount || debtors.length ? "boter" : "deltakere";
 
   // Until the basics are in place, a checklist sits on top.
@@ -340,6 +353,35 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <p className="text-sm text-muted">Strava er koblet til ({connected} {connected === 1 ? "deltaker" : "deltakere"}), men øktene hentes bare hvert 10. minutt. Slå på sanntids-synk så kommer de inn med en gang.</p>
                     <ActivateWebhook action={activateStravaWebhook} />
                   </>
+                )}
+                {stravaConfigured() && (
+                  <details className="pt-2">
+                    <summary className="cursor-pointer text-sm font-semibold">Feilsøking: hvem er koblet til, og hva har Strava sendt?</summary>
+                    <ul className="mt-2 divide-y divide-line text-sm">
+                      {stravaPeople.map((p) => (
+                        <li key={p.id} className="flex items-center gap-2 py-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold">{p.name} {p.connected ? <span className="text-ok">· koblet til</span> : <span className="text-muted">· ikke koblet til</span>}</p>
+                            {p.connected && (
+                              <p className="text-xs text-muted">
+                                Hentet {p.synced ? ago(new Date(p.synced)) : "aldri"}
+                                {p.last ? ` · siste Strava-økt: ${sportLabel(p.last_sport!)} ${relativeTime(new Date(p.last))}` : " · ingen Strava-økter ennå"}
+                              </p>
+                            )}
+                          </div>
+                          {p.connected && <form action={adminSyncStrava.bind(null, p.id)}><button className="btn btn-ghost btn-sm">Hent nå</button></form>}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-3 mb-1 text-xs font-bold tracking-wider text-muted uppercase">Siste beskjeder fra Strava</p>
+                    {stravaEvents.length ? (
+                      <ul className="space-y-1.5 text-xs">
+                        {stravaEvents.map((e, i) => (
+                          <li key={i}><span className="text-muted">{relativeTime(new Date(e.created_at))}</span> · <strong>{e.name ?? `ukjent konto ${e.owner_id}`}</strong> · {e.result}</li>
+                        ))}
+                      </ul>
+                    ) : <p className="text-xs text-muted">Ingen ennå (loggføres fra nå av).</p>}
+                  </details>
                 )}
               </section>
               <section className="card p-4">
