@@ -51,6 +51,8 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   const me = board.members.find((m) => m.id === user.id);
   const myWeek = me?.results[weekIndex];
   const allowed = !me && (await mayJoin(c, user.id));
+  // The admin can paste the bøtekasse's Vipps link; then paying is one tap that opens the Vipps app.
+  const vippsLink = /^https:\/\/\S+$/.test(c.vipps_info?.trim() ?? "") ? c.vipps_info!.trim() : null;
   const owedWeeks = me?.results.filter((r) => r.fine === "owed").map((r) => r.week) ?? [];
   const started = today >= c.starts_on;
   const over = today > c.ends_on;
@@ -118,9 +120,17 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
         <section className="rounded-2xl bg-bad p-4 text-white">
           <p className="display text-3xl">Du skylder {owedWeeks.length * c.penalty_kr} kr</p>
           <p className="mt-1 text-sm opacity-90">
-            For {owedWeeks.map((w) => `uke ${isoWeekNumber(w)}`).join(", ")}. {c.vipps_info ? `Vipps til ${c.vipps_info}.` : "Vipps til bøtekassa."}
+            For {owedWeeks.map((w) => `uke ${isoWeekNumber(w)}`).join(", ")}.
+            {vippsLink ? " Betal i Vipps, og trykk så «Jeg har betalt»." : c.vipps_info ? ` Vipps til ${c.vipps_info}.` : " Vipps til bøtekassa."}
           </p>
-          <div className="mt-3"><ClaimPaid weeks={owedWeeks} /></div>
+          <div className="mt-3 flex flex-col gap-2">
+            {vippsLink && (
+              <a href={vippsLink} target="_blank" rel="noopener noreferrer" className="btn w-full bg-[#ff5b24] text-white">
+                Betal {owedWeeks.length * c.penalty_kr} kr med Vipps
+              </a>
+            )}
+            <ClaimPaid weeks={owedWeeks} />
+          </div>
         </section>
       )}
       {me && me.claimedKr > 0 && (

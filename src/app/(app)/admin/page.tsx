@@ -67,8 +67,8 @@ function ChallengeFields({ c }: { c?: Challenge }) {
         <textarea name="description" rows={3} className="field" defaultValue={c?.description ?? ""} placeholder="Åtte uker før jul. Den som har flest uker i boks slipper å vaske opp på julaften." />
       </label>
       <label className="block">
-        <span className="label">Vipps til (vises når noen skylder)</span>
-        <input name="vipps_info" className="field" defaultValue={c?.vipps_info ?? ""} placeholder="Bøtekassa #123456 eller 900 00 000" />
+        <span className="label">Vipps-lenke til bøtekassa (vises når noen skylder)</span>
+        <input name="vipps_info" className="field" defaultValue={c?.vipps_info ?? ""} placeholder="Lim inn Vipps-lenken til bøtekassa, eller skriv navn/nummer" />
       </label>
     </>
   );
@@ -101,7 +101,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Until the basics are in place, a checklist sits on top.
   const setup = [
     { done: !!c, text: "Opprett en utfordring", href: "?fane=regler" },
-    { done: !!c?.vipps_info, text: "Legg inn Vipps-nummeret til bøtekassa", href: "?fane=regler" },
+    { done: !!c?.vipps_info, text: "Legg inn Vipps-lenken til bøtekassa", href: "?fane=regler" },
     { done: users.length > 1, text: "Legg til deltakerne og send dem invitasjonen", href: "?fane=deltakere" },
     { done: stravaConfigured(), text: "Koble appen til Strava (API-nøkler fra strava.com/settings/api)", href: null },
   ];
