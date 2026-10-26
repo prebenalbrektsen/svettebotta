@@ -7,7 +7,7 @@ import { processAvatar, processProof } from "@/lib/images";
 import { checkPassword, hashPassword, newToken, requireAdmin, requireUser } from "@/lib/auth";
 import { activeChallenge, checkInDeadline, loadBoard, mayJoin, type Challenge } from "@/lib/challenge";
 import { one, query } from "@/lib/db";
-import { disconnectStrava, syncStrava } from "@/lib/strava";
+import { disconnectStrava, subscribeWebhook, syncStrava } from "@/lib/strava";
 import { sportLabel, WATER_SPORTS } from "@/lib/sports";
 import { addDays, formatDay, fromOsloLocal, mondayOf, osloDate } from "@/lib/time";
 
@@ -424,4 +424,12 @@ export async function toggleInvite(challengeId: number, userId: number): Promise
   const removed = await query("delete from challenge_invites where challenge_id = $1 and user_id = $2 returning 1", [challengeId, userId]);
   if (!removed.length) await query("insert into challenge_invites (challenge_id, user_id) values ($1, $2)", [challengeId, userId]);
   revalidatePath("/", "layout");
+}
+
+/** Admin: ask Strava to notify the app about new workouts (one subscription for the whole app). */
+export async function activateStravaWebhook(): Promise<ActionState> {
+  await requireAdmin();
+  const r = await subscribeWebhook();
+  revalidatePath("/admin");
+  return r.ok ? { ok: r.message } : { error: r.message };
 }

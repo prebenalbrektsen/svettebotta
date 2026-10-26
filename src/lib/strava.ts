@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { announceWeek } from "./announce";
 import { one, query } from "./db";
 
@@ -84,6 +85,27 @@ type Activity = {
   average_heartrate?: number;
 };
 
+/** Saves one Strava activity as a workout (new or updated). Returns true when it was new. */
+async function importActivity(userId: number, a: Activity): Promise<boolean> {
+  // Moving time, so a watch left running in the changing room doesn't count; gym sessions
+  // often have no "moving" so fall back to elapsed.
+  const minutes = Math.round((a.moving_time || a.elapsed_time) / 60);
+  if (minutes < 1) return false;
+  const rows = await query<{ id: number; inserted: boolean }>(
+    `insert into workouts (user_id, started_at, duration_min, sport, title, distance_m, elevation_m, avg_hr, source, strava_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, 'strava', $9)
+     on conflict (strava_id) do update set
+       duration_min = excluded.duration_min, sport = excluded.sport, title = excluded.title,
+       distance_m = excluded.distance_m, elevation_m = excluded.elevation_m, avg_hr = excluded.avg_hr
+     returning id, (xmax = 0) as inserted`,
+    [userId, a.start_date, minutes, a.sport_type, a.name, Math.round(a.distance) || null,
+      Math.round(a.total_elevation_gain) || null, a.average_heartrate ? Math.round(a.average_heartrate) : null, a.id],
+  );
+  if (!rows[0]?.inserted) return false;
+  await mergeManualDuplicate(userId, rows[0].id, a.start_date);
+  return true;
+}
+
 /** Imports the user's Strava activities since `since`. Returns how many were new. */
 export async function syncStrava(userId: number, since: Date): Promise<number> {
   const token = await accessToken(userId);
@@ -94,26 +116,7 @@ export async function syncStrava(userId: number, since: Date): Promise<number> {
     const res = await fetch(`${API}/athlete/activities?${params}`, { headers: { authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(`Strava activities ${res.status}: ${await res.text()}`);
     const activities = (await res.json()) as Activity[];
-    for (const a of activities) {
-      // Moving time, so a watch left running in the changing room doesn't count; gym sessions
-      // often have no "moving" so fall back to elapsed.
-      const minutes = Math.round((a.moving_time || a.elapsed_time) / 60);
-      if (minutes < 1) continue;
-      const rows = await query<{ id: number; inserted: boolean }>(
-        `insert into workouts (user_id, started_at, duration_min, sport, title, distance_m, elevation_m, avg_hr, source, strava_id)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, 'strava', $9)
-         on conflict (strava_id) do update set
-           duration_min = excluded.duration_min, sport = excluded.sport, title = excluded.title,
-           distance_m = excluded.distance_m, elevation_m = excluded.elevation_m, avg_hr = excluded.avg_hr
-         returning id, (xmax = 0) as inserted`,
-        [userId, a.start_date, minutes, a.sport_type, a.name, Math.round(a.distance) || null,
-          Math.round(a.total_elevation_gain) || null, a.average_heartrate ? Math.round(a.average_heartrate) : null, a.id],
-      );
-      if (rows[0]?.inserted) {
-        added++;
-        await mergeManualDuplicate(userId, rows[0].id, a.start_date);
-      }
-    }
+    for (const a of activities) if (await importActivity(userId, a)) added++;
     if (activities.length < 100) break;
   }
   await query("update users set strava_synced_at = now() where id = $1", [userId]);
@@ -145,4 +148,61 @@ export async function mergeManualDuplicate(userId: number, stravaWorkoutId: numb
   await query("insert into kudos (workout_id, user_id, created_at) select $1, user_id, created_at from kudos where workout_id = $2 on conflict do nothing", [stravaWorkoutId, manual.id]);
   await query("update comments set workout_id = $1 where workout_id = $2", [stravaWorkoutId, manual.id]);
   await query("delete from workouts where id = $1", [manual.id]);
+}
+
+// ---- Webhook: Strava tells us about new/changed/deleted activities within seconds ----
+
+const CALLBACK_PATH = "/api/strava/webhook";
+
+/** Shared secret Strava echoes back when the subscription is created; derived, so no extra setting. */
+export function webhookVerifyToken(): string {
+  return createHash("sha256").update(`svettebotta-webhook:${process.env.STRAVA_CLIENT_SECRET ?? ""}`).digest("hex").slice(0, 32);
+}
+
+function appCredentials() {
+  return { client_id: process.env.STRAVA_CLIENT_ID!, client_secret: process.env.STRAVA_CLIENT_SECRET! };
+}
+
+/** The app's webhook subscription, if one exists (Strava allows one per app). */
+export async function webhookStatus(): Promise<{ id: number; callback_url: string } | null> {
+  if (!stravaConfigured()) return null;
+  const res = await fetch(`${API}/push_subscriptions?${new URLSearchParams(appCredentials())}`);
+  if (!res.ok) return null;
+  const list = (await res.json()) as { id: number; callback_url: string }[];
+  return list[0] ?? null;
+}
+
+/** Creates the subscription. Strava immediately calls our GET endpoint to check the token. */
+export async function subscribeWebhook(): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API}/push_subscriptions`, {
+    method: "POST",
+    body: new URLSearchParams({ ...appCredentials(), callback_url: `${process.env.APP_URL}${CALLBACK_PATH}`, verify_token: webhookVerifyToken() }),
+  });
+  const body = await res.text();
+  return res.ok ? { ok: true, message: "Sanntids-synk er på." } : { ok: false, message: `Strava sa nei (${res.status}): ${body.slice(0, 200)}` };
+}
+
+type WebhookEvent = { object_type: "activity" | "athlete"; aspect_type: "create" | "update" | "delete"; object_id: number; owner_id: number; updates?: Record<string, string> };
+
+export async function handleWebhookEvent(e: WebhookEvent): Promise<void> {
+  const user = await one<{ id: number }>("select id from users where strava_athlete_id = $1", [e.owner_id]);
+  if (!user) return;
+  if (e.object_type === "athlete") {
+    // The person revoked access on strava.com.
+    if (e.updates?.authorized === "false") {
+      await query("update users set strava_athlete_id = null, strava_access_token = null, strava_refresh_token = null, strava_expires_at = null where id = $1", [user.id]);
+    }
+    return;
+  }
+  if (e.aspect_type === "delete") {
+    // Deleted on Strava: drop it, unless it was already checked in (then the photo is the proof).
+    await query("delete from workouts where strava_id = $1 and checked_in_at is null", [e.object_id]);
+    return;
+  }
+  const token = await accessToken(user.id);
+  if (!token) return;
+  const res = await fetch(`${API}/activities/${e.object_id}`, { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Strava activity ${res.status}`);
+  if (await importActivity(user.id, (await res.json()) as Activity)) await announceWeek(user.id);
+  await query("update users set strava_synced_at = now() where id = $1", [user.id]);
 }

@@ -5,9 +5,10 @@ import { Icon } from "@/components/Icon";
 import { requireAdmin } from "@/lib/auth";
 import { activeChallenge, loadBoard, type Challenge } from "@/lib/challenge";
 import { query } from "@/lib/db";
-import { stravaConfigured } from "@/lib/strava";
+import { stravaConfigured, webhookStatus } from "@/lib/strava";
+import { ActivateWebhook } from "@/components/ActivateWebhook";
 import { addDays, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
-import { confirmAllClaimed, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
+import { activateStravaWebhook, confirmAllClaimed, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
 
 const TABS = [
   { id: "boter", label: "Bøter" },
@@ -96,6 +97,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const settled = (board?.members ?? []).flatMap((m) => m.results.filter((r) => r.fine === "paid" || r.fine === "waived").map((r) => ({ m, r })));
 
   const { fane } = await searchParams;
+  const webhook = fane === "regler" ? await webhookStatus().catch(() => null) : null;
+  const connected = users.filter((u) => u.strava).length;
   const tab = TABS.some((t) => t.id === fane) ? fane! : claimedCount || debtors.length ? "boter" : "deltakere";
 
   // Until the basics are in place, a checklist sits on top.
@@ -263,6 +266,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
           {tab === "regler" && (
             <>
+              <section className="card space-y-2 p-4">
+                <h2 className="font-bold">Strava</h2>
+                {!stravaConfigured() ? (
+                  <p className="text-sm text-muted">Ikke satt opp ennå: legg inn STRAVA_CLIENT_ID og STRAVA_CLIENT_SECRET i Vercel og deploy på nytt.</p>
+                ) : webhook ? (
+                  <p className="text-sm"><strong className="text-ok">✓ Tilkoblet med sanntids-synk.</strong> <span className="text-muted">Nye økter kommer inn sekunder etter at de er lagret på Strava. {connected} {connected === 1 ? "deltaker har" : "deltakere har"} koblet til.</span></p>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted">Strava er koblet til ({connected} {connected === 1 ? "deltaker" : "deltakere"}), men øktene hentes bare hvert 10. minutt. Slå på sanntids-synk så kommer de inn med en gang.</p>
+                    <ActivateWebhook action={activateStravaWebhook} />
+                  </>
+                )}
+              </section>
               <section className="card p-4">
                 <h2 className="mb-1 font-bold">{c.name}</h2>
                 <p className="mb-3 text-sm text-muted">Endringer gjelder hele utfordringen, også uker som er ferdige – bøtene regnes ut på nytt.</p>
