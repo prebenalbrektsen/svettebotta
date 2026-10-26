@@ -21,7 +21,18 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
   const base = onStrava ? LINKS.map((l) => (l.href === "/logg" ? { ...l, label: "Økter", icon: "M22 12h-4l-3 9L9 3l-3 9H2" } : l)) : LINKS;
   const links = isAdmin ? [...base, ADMIN] : base;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
-  const counts = badges;
+  // Start from the server's numbers, then ask again after every page change and when the app
+  // comes back, so a badge clears as soon as you've seen the thing (the layout itself doesn't re-render).
+  const [counts, setCounts] = useState<Record<string, number>>(badges);
+  useEffect(() => { setCounts(badges); }, [badges]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => fetch("/api/merker", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((b) => { if (b && !cancelled) setCounts(b); }).catch(() => {});
+    load();
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
+  }, [path]);
   // Tapping the tab you're already on scrolls back to the top, like iOS.
   const onTabClick = (href: string) => (e: React.MouseEvent) => {
     if (path !== href) return;
@@ -43,7 +54,7 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, links.length, mobile]);
   // The red number on the home-screen icon: the same things the tab badges show.
-  const total = Object.values(badges).reduce((a, b) => a + b, 0);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
   useEffect(() => {
     if (!mobile) return;
     const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
