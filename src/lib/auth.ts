@@ -14,6 +14,7 @@ export type User = {
   is_admin: boolean;
   color: string;
   strava_athlete_id: string | null;
+  approved: boolean;
   strava_synced_at: Date | null;
 };
 
@@ -53,7 +54,7 @@ export async function currentUser(): Promise<User | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   return one<User>(
-    `select u.id, u.name, u.email, u.is_admin, u.color, u.strava_athlete_id, u.strava_synced_at
+    `select u.id, u.name, u.email, u.is_admin, u.color, u.strava_athlete_id, u.strava_synced_at, u.approved
        from sessions s join users u on u.id = s.user_id
       where s.token = $1 and s.expires_at > now()`,
     [token],
@@ -63,6 +64,8 @@ export async function currentUser(): Promise<User | null> {
 export async function requireUser(): Promise<User> {
   const user = await currentUser();
   if (!user) redirect("/login");
+  // Joined through the shared family link and not approved yet: only the waiting room.
+  if (!user.approved) redirect("/venter");
   return user;
 }
 

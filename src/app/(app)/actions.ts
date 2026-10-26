@@ -433,3 +433,31 @@ export async function activateStravaWebhook(): Promise<ActionState> {
   revalidatePath("/admin");
   return r.ok ? { ok: r.message } : { error: r.message };
 }
+
+// ---- Shared family invite link ----
+
+export async function createGroupLink(): Promise<void> {
+  await requireAdmin();
+  await query("insert into settings (key, value) values ('group_invite', $1) on conflict (key) do update set value = excluded.value", [newToken(12)]);
+  revalidatePath("/admin");
+}
+
+export async function disableGroupLink(): Promise<void> {
+  await requireAdmin();
+  await query("delete from settings where key = 'group_invite'");
+  revalidatePath("/admin");
+}
+
+export async function approveUser(userId: number): Promise<void> {
+  await requireAdmin();
+  const u = await one<{ name: string }>("update users set approved = true where id = $1 and not approved returning name", [userId]);
+  if (u) await query("insert into messages (user_id, body) values (null, $1)", [`👋 ${u.name} er med i Svettebøtta!`]);
+  revalidatePath("/", "layout");
+}
+
+/** Someone the admin doesn't know asked to join: remove the account again. */
+export async function rejectUser(userId: number): Promise<void> {
+  await requireAdmin();
+  await query("delete from users where id = $1 and not approved", [userId]);
+  revalidatePath("/", "layout");
+}

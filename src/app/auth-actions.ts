@@ -57,3 +57,23 @@ export async function logout(): Promise<void> {
 export async function hasUsers(): Promise<boolean> {
   return (await query("select 1 from users limit 1")).length > 0;
 }
+
+/** Shared family link: anyone with it can ask to join; the admin approves them before they get in. */
+export async function joinViaGroupLink(_: FormState, form: FormData): Promise<FormState> {
+  const token = String(form.get("token") ?? "");
+  const valid = await one("select 1 from settings where key = 'group_invite' and value = $1", [token]);
+  if (!token || !valid) return { error: "Lenken er ikke lenger i bruk. Be kontrolløren om en ny." };
+  const name = String(form.get("name") ?? "").trim().slice(0, 40);
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const password = String(form.get("password") ?? "");
+  if (!name || !email || password.length < 8) return { error: "Fyll inn navn, e-post og et passord på minst 8 tegn." };
+  if (await one("select 1 from users where lower(email) = $1", [email])) return { error: "Den e-posten er allerede i bruk. Logg inn i stedet." };
+  const colors = ["#e4572e", "#2e86ab", "#7a9e3e", "#a23b72", "#f18f01", "#3b1f2b", "#0f7173", "#c73e1d", "#6a4c93", "#1982c4"];
+  const count = await one<{ n: number }>("select count(*)::int as n from users");
+  const user = await one<{ id: number }>(
+    "insert into users (name, email, password_hash, color, approved) values ($1, $2, $3, $4, false) returning id",
+    [name, email, await hashPassword(password), colors[count!.n % colors.length]],
+  );
+  await startSession(user!.id);
+  redirect("/venter");
+}

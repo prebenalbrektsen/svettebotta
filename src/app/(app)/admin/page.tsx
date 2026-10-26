@@ -8,7 +8,7 @@ import { query } from "@/lib/db";
 import { stravaConfigured, webhookStatus } from "@/lib/strava";
 import { ActivateWebhook } from "@/components/ActivateWebhook";
 import { addDays, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
-import { activateStravaWebhook, confirmAllClaimed, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
+import { activateStravaWebhook, approveUser, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
 
 const TABS = [
   { id: "boter", label: "Bøter" },
@@ -79,9 +79,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   await requireAdmin();
   const c = await activeChallenge();
   const board = c ? await loadBoard(c) : null;
-  const users = await query<{ id: number; name: string; email: string | null; invite_token: string | null; is_admin: boolean; strava: boolean }>(
-    "select id, name, email, invite_token, is_admin, strava_athlete_id is not null as strava from users order by name",
+  const allUsers = await query<{ id: number; name: string; email: string | null; invite_token: string | null; is_admin: boolean; strava: boolean; approved: boolean; created_at: Date }>(
+    "select id, name, email, invite_token, is_admin, strava_athlete_id is not null as strava, approved, created_at from users order by name",
   );
+  const users = allUsers.filter((u) => u.approved);
+  const pending = allUsers.filter((u) => !u.approved);
+  const groupToken = (await query<{ value: string }>("select value from settings where key = 'group_invite'"))[0]?.value ?? null;
   const memberIds = new Set(board?.members.map((m) => m.id));
   const invited = new Set(
     c ? (await query<{ user_id: number }>("select user_id from challenge_invites where challenge_id = $1", [c.id])).map((r) => r.user_id) : [],
@@ -99,7 +102,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { fane } = await searchParams;
   const webhook = fane === "regler" ? await webhookStatus().catch(() => null) : null;
   const connected = users.filter((u) => u.strava).length;
-  const tab = TABS.some((t) => t.id === fane) ? fane! : claimedCount || debtors.length ? "boter" : "deltakere";
+  const tab = TABS.some((t) => t.id === fane) ? fane! : pending.length ? "deltakere" : claimedCount || debtors.length ? "boter" : "deltakere";
 
   // Until the basics are in place, a checklist sits on top.
   const setup = [
@@ -139,6 +142,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <Link key={t.id} href={`?fane=${t.id}`} className={`relative shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${tab === t.id ? "bg-ink text-paper" : "bg-line/60 text-muted"}`}>
                 {t.label}
                 {t.id === "boter" && claimedCount > 0 && <span className="ml-1.5 rounded-full bg-heat px-1.5 text-xs text-white">{claimedCount}</span>}
+                {t.id === "deltakere" && pending.length > 0 && <span className="ml-1.5 rounded-full bg-heat px-1.5 text-xs text-white">{pending.length}</span>}
               </Link>
             ))}
           </nav>
@@ -221,6 +225,44 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </li>
                   ))}
                 </ul>
+              )}
+            </section>
+          )}
+
+          {tab === "deltakere" && pending.length > 0 && (
+            <section className="card border-2 border-heat p-4">
+              <h2 className="mb-1 font-bold">Venter på godkjenning</h2>
+              <p className="mb-2 text-sm text-muted">Kom inn via fellesinvitasjonen. Godkjenn de du kjenner.</p>
+              <ul className="divide-y divide-line">
+                {pending.map((u) => (
+                  <li key={u.id} className="flex flex-wrap items-center gap-2 py-2.5">
+                    <div className="min-w-0 flex-1 basis-40">
+                      <p className="font-semibold break-words">{u.name}</p>
+                      <p className="text-xs text-muted">{u.email}</p>
+                    </div>
+                    <form action={approveUser.bind(null, u.id)}><button className="btn btn-sm bg-ok">Godkjenn</button></form>
+                    <form action={rejectUser.bind(null, u.id)}><button className="btn btn-ghost btn-sm">Avvis</button></form>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {tab === "deltakere" && (
+            <section className="card space-y-2 p-4">
+              <h2 className="font-bold">Fellesinvitasjon</h2>
+              <p className="text-sm text-muted">Én lenke du kan legge i familiechatten. De som åpner den lager konto selv – og du godkjenner dem her før de kommer inn.</p>
+              {groupToken ? (
+                <>
+                  <p className="truncate rounded-lg bg-line/50 px-3 py-2 text-xs">{appUrl}/bli-med/{groupToken}</p>
+                  <CopyLink url={`${appUrl}/bli-med/${groupToken}`} big />
+                  <div className="flex gap-3 text-xs">
+                    <form action={createGroupLink}><button className="font-semibold text-muted underline">Lag ny lenke (den gamle slutter å virke)</button></form>
+                    <form action={disableGroupLink}><button className="font-semibold text-muted underline">Slå av</button></form>
+                  </div>
+                </>
+              ) : (
+                <form action={createGroupLink}><button className="btn btn-heat">Lag fellesinvitasjon</button></form>
               )}
             </section>
           )}

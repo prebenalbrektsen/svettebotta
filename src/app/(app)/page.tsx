@@ -1,3 +1,4 @@
+import { InstallPrompt } from "@/components/InstallPrompt";
 import Link from "next/link";
 import { Pill, statusLabel, WeekProgress } from "@/components/WeekProgress";
 import { ClaimPaid } from "@/components/ClaimPaid";
@@ -51,6 +52,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   const me = board.members.find((m) => m.id === user.id);
   const myWeek = me?.results[weekIndex];
   const allowed = !me && (await mayJoin(c, user.id));
+  const pendingUsers = user.is_admin ? (await query<{ n: number }>("select count(*)::int as n from users where not approved"))[0].n : 0;
   // The admin can paste the bøtekasse's Vipps link; then paying is one tap that opens the Vipps app.
   const vippsLink = /^https:\/\/\S+$/.test(c.vipps_info?.trim() ?? "") ? c.vipps_info!.trim() : null;
   const owedWeeks = me?.results.filter((r) => r.fine === "owed").map((r) => r.week) ?? [];
@@ -85,6 +87,15 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
           {ruleParts(c).map((r) => <li key={r} className="rounded-full bg-line/70 px-2.5 py-1 text-xs font-semibold">{r}</li>)}
         </ul>
       </section>
+
+      {pendingUsers > 0 && (
+        <Link href="/admin?fane=deltakere" className="block rounded-2xl border-2 border-heat bg-card p-4">
+          <p className="font-bold">{pendingUsers === 1 ? "1 person venter" : `${pendingUsers} personer venter`} på godkjenning</p>
+          <p className="text-sm text-muted">Kom inn via fellesinvitasjonen – godkjenn under Admin →</p>
+        </Link>
+      )}
+
+      <InstallPrompt variant="banner" />
 
       {!me && (allowed
         ? <JoinCard c={c} joined={false} count={board.members.length} />

@@ -1,3 +1,4 @@
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { ConnectWithStrava } from "@/components/StravaBrand";
 import Link from "next/link";
 import { JoinCard } from "@/components/JoinCard";
@@ -43,10 +44,8 @@ export default async function WelcomePage() {
 
       <section className="card space-y-3 p-4">
         <div className="flex items-center gap-3"><span className={step}>{stravaConfigured() ? 3 : 2}</span><h2 className="font-bold">Legg appen på hjemskjermen</h2></div>
-        <ul className="space-y-2 text-sm">
-          <li><strong>iPhone (Safari):</strong> trykk Del-knappen (firkant med pil opp) → «Legg til på Hjem-skjerm».</li>
-          <li><strong>Android (Chrome):</strong> trykk ⋮ øverst til høyre → «Legg til på startskjermen».</li>
-        </ul>
+        <InstallPrompt />
+        <p className="text-xs text-muted">Ser du ingen veiledning over, er appen allerede lagt til – eller du er på en PC.</p>
       </section>
 
       <section className="card space-y-3 p-4">

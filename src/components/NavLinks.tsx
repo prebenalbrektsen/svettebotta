@@ -11,15 +11,16 @@ const LINKS = [
   { href: "/meg", label: "Meg", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-8 9a8 8 0 0 1 16 0" },
 ];
 
-export function NavLinks({ isAdmin, mobile, unread = 0, onStrava }: { isAdmin: boolean; mobile?: boolean; unread?: number; onStrava?: boolean }) {
+export function NavLinks({ isAdmin, mobile, unread = 0, onStrava, adminBadge = 0 }: { isAdmin: boolean; mobile?: boolean; unread?: number; onStrava?: boolean; adminBadge?: number }) {
   const path = usePathname();
   // On Strava the watch logs for you, so the tab is a list of workouts, not a form.
   const base = onStrava ? LINKS.map((l) => (l.href === "/logg" ? { ...l, label: "Økter", icon: "M22 12h-4l-3 9L9 3l-3 9H2" } : l)) : LINKS;
   const links = isAdmin ? [...base, { href: "/admin", label: "Admin", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7.1 19.7l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3.1 14H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.3 7.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" }] : base;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const counts: Record<string, number> = { "/prat": unread, "/admin": adminBadge };
   const badge = (href: string) =>
-    href === "/prat" && unread > 0 && !active(href) ? (
-      <span className="absolute -top-1 -right-2 min-w-4 rounded-full bg-heat px-1 text-center text-[10px] leading-4 font-bold text-white">{unread > 9 ? "9+" : unread}</span>
+    counts[href] > 0 && !active(href) ? (
+      <span className="absolute -top-1 -right-2 min-w-4 rounded-full bg-heat px-1 text-center text-[10px] leading-4 font-bold text-white">{counts[href] > 9 ? "9+" : counts[href]}</span>
     ) : null;
   if (mobile) {
     return (

@@ -1,3 +1,4 @@
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { AuthForm } from "@/components/AuthForm";
 import { Logo } from "@/components/Logo";
 import { one } from "@/lib/db";
@@ -9,7 +10,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col px-4 pt-[12vh] pb-10">
       <Logo size="lg" />
-      <div className="card mt-8 p-5">
+      <div className="mt-6"><InstallPrompt /></div>
+      <div className="card mt-4 p-5">
         {user ? (
           <>
             <h1 className="mb-1 text-lg font-bold">Hei, {user.name}!</h1>
