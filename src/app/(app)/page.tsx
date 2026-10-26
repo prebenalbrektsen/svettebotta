@@ -256,7 +256,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
                 <WorkoutRow key={w.id} w={w} who={m} me={user.id} c={c} task={board.tasks.get(mondayOf(osloDate(new Date(w.started_at))))} />
               ))}
             </ul>
-            <Link href="/siste" className="btn btn-ghost mt-2 w-full">Se alle økter</Link>
+            <Link href="/logg?vis=alle" className="btn btn-ghost mt-2 w-full">Se alle økter</Link>
           </>
         ) : (
           <p className="py-4 text-sm text-muted">Ingen økter ennå. Hvem blir først?</p>

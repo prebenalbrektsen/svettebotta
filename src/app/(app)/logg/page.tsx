@@ -3,7 +3,8 @@ import { LogForm } from "@/components/LogForm";
 import { SyncButton } from "@/components/SyncButton";
 import { WorkoutRow } from "@/components/WorkoutRow";
 import { requireUser } from "@/lib/auth";
-import { activeChallenge, annotate, evaluateWeek, WORKOUT_COLUMNS, type WeeklyTask, type Workout } from "@/lib/challenge";
+import { AllWorkouts, WorkoutsSwitch } from "@/components/AllWorkouts";
+import { activeChallenge, annotate, evaluateWeek, loadBoard, WORKOUT_COLUMNS, type WeeklyTask, type Workout } from "@/lib/challenge";
 import { Pill, statusLabel, WeekProgress } from "@/components/WeekProgress";
 import { WatchGuide } from "@/components/WatchGuide";
 import { Icon } from "@/components/Icon";
@@ -11,10 +12,23 @@ import { one, query } from "@/lib/db";
 import { stravaConfigured } from "@/lib/strava";
 import { addDays, ago, mondayOf, osloDate, toOsloLocalInput } from "@/lib/time";
 
-export default async function LogPage() {
+export default async function LogPage({ searchParams }: { searchParams: Promise<{ vis?: string }> }) {
   const user = await requireUser();
   const c = await activeChallenge();
   if (!c) return <p className="pt-6 text-muted">Ingen utfordring er i gang.</p>;
+  const mineLabel = user.strava_athlete_id ? "Mine" : "Logg ny";
+
+  // «Alle»: everyone's checked-in workouts, grouped by day.
+  if ((await searchParams).vis === "alle") {
+    const board = await loadBoard(c);
+    return (
+      <div className="space-y-4 pt-2">
+        <h1 className="display text-5xl">Økter</h1>
+        <WorkoutsSwitch all mineLabel={mineLabel} />
+        <AllWorkouts c={c} board={board} me={user.id} isAdmin={user.is_admin} />
+      </div>
+    );
+  }
   const week = mondayOf(osloDate());
   const task = await one<WeeklyTask>("select id, week_start, title, description, auto_sports from weekly_tasks where challenge_id = $1 and week_start = $2", [c.id, week]);
   const form = (
@@ -43,6 +57,7 @@ export default async function LogPage() {
     return (
       <div className="space-y-4 pt-2">
         <h1 className="display text-5xl">Økter</h1>
+        <WorkoutsSwitch all={false} mineLabel={mineLabel} />
         <section className="card p-4">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-line/70"><Icon name="pulse" /></span>
@@ -85,6 +100,7 @@ export default async function LogPage() {
   return (
     <div className="space-y-4 pt-2">
       <h1 className="display text-5xl">Logg økt</h1>
+      <WorkoutsSwitch all={false} mineLabel={mineLabel} />
       {stravaConfigured() && (
         <section className="card p-4">
           <p className="display text-2xl">Slipp å taste inn</p>
