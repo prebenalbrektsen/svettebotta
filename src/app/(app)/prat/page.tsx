@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { Avatar } from "@/components/Avatar";
 import { ChatBox, ScrollToEnd } from "@/components/ChatBox";
@@ -39,9 +40,9 @@ export default async function ChatPage() {
           const sameAsPrev = !newDay && prev?.user_id === m.user_id;
           return [separator, (
             <li key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start pl-9"}`}>
-              {!mine && !sameAsPrev && <span className="mb-0.5 ml-1 flex items-center gap-1.5 text-xs font-bold" style={{ color: m.color! }}>{m.name}{m.is_admin && <RoleTag />}</span>}
+              {!mine && !sameAsPrev && <Link href={`/person/${m.user_id}`} className="mb-0.5 ml-1 flex items-center gap-1.5 text-xs font-bold" style={{ color: m.color! }}>{m.name}{m.is_admin && <RoleTag />}</Link>}
               <div className={`relative max-w-[80%] rounded-2xl px-3.5 py-2 ${mine ? "bg-heat text-white" : "card"}`}>
-                {!mine && !sameAsPrev && <span className="absolute top-0 -left-9"><Avatar p={{ id: m.user_id, name: m.name!, color: m.color!, avatar_v: m.avatar_v }} size={28} /></span>}
+                {!mine && !sameAsPrev && <Link href={`/person/${m.user_id}`} className="absolute top-0 -left-9" aria-label={`Profilen til ${m.name}`}><Avatar p={{ id: m.user_id, name: m.name!, color: m.color!, avatar_v: m.avatar_v }} size={28} /></Link>}
                 <p className="break-words whitespace-pre-wrap">{m.body}</p>
                 <div className={`mt-0.5 flex items-center justify-end gap-1 text-[11px] ${mine ? "text-white/80" : "text-muted"}`}>
                   {timeFmt.format(new Date(m.created_at))}
