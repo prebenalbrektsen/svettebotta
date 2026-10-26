@@ -1,3 +1,5 @@
+import { StayFresh } from "@/components/StayFresh";
+import { APP_VERSION } from "@/lib/version";
 import Link from "next/link";
 import { after } from "next/server";
 import { Logo } from "@/components/Logo";
@@ -26,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="hidden sm:block"><NavLinks isAdmin={user.is_admin} unread={unread!.n} onStrava={!!user.strava_athlete_id} adminBadge={pendingUsers} /></div>
       </header>
       <main className="px-4">{children}</main>
+      <StayFresh version={APP_VERSION} />
       <nav className="tab-bar fixed inset-x-3 bottom-[calc(10px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-md sm:hidden">
         <NavLinks isAdmin={user.is_admin} unread={unread!.n} onStrava={!!user.strava_athlete_id} adminBadge={pendingUsers} mobile />
       </nav>
