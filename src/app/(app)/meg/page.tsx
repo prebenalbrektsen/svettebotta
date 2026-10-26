@@ -1,3 +1,5 @@
+import { PushSettings } from "@/components/PushSettings";
+import { CATEGORIES } from "@/lib/push";
 import { Badges, badgesFor, Records, WeeklyChart } from "@/components/Profile";
 import { firstFinishCounts, personStats } from "@/lib/leaderboard";
 import { ConnectWithStrava, PoweredByStrava } from "@/components/StravaBrand";
@@ -30,6 +32,8 @@ const STRAVA_MSG: Record<string, [string, string]> = {
 export default async function MePage({ searchParams }: { searchParams: Promise<{ strava?: string }> }) {
   const user = await requireUser();
   const { strava } = await searchParams;
+  const prefs = (await one<{ notify: Record<string, boolean> }>("select notify from users where id = $1", [user.id]))!.notify;
+  const categories = Object.fromEntries(Object.entries(CATEGORIES).filter(([k]) => k !== "admin" || user.is_admin));
   const passkeys = await query<{ id: number; name: string; last_used_at: Date | null; created_at: Date }>(
     "select id, name, last_used_at, created_at from passkeys where user_id = $1 order by created_at", [user.id]);
   const avatarV = (await one<{ v: number | null }>("select extract(epoch from avatar_updated_at)::int as v from users where id = $1", [user.id]))!.v;
@@ -138,6 +142,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </ul>
         </section>
       )}
+
+      <section className="card space-y-3 p-4">
+        <h2 className="font-bold">Varsler</h2>
+        <p className="text-sm text-muted">Få beskjed på telefonen om kudos, innsjekk og når uka holder på å glippe. Velg selv hva du vil ha.</p>
+        <PushSettings categories={categories} prefs={prefs} />
+      </section>
 
       <section className="card space-y-3 p-4">
         <h2 className="font-bold">Logg inn med Face ID</h2>

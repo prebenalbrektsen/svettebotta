@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { admins, push } from "@/lib/push";
 import { checkPassword, endSession, hashPassword, startSession } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 
@@ -75,5 +77,6 @@ export async function joinViaGroupLink(_: FormState, form: FormData): Promise<Fo
     [name, email, await hashPassword(password), colors[count!.n % colors.length]],
   );
   await startSession(user!.id);
+  after(async () => push(await admins(), "admin", { title: "👋 Ny deltaker venter", body: `${name} vil bli med i Svettebøtta`, url: "/admin?fane=deltakere" }));
   redirect("/venter");
 }

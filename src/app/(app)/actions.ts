@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { announceWeek } from "@/lib/announce";
 import { processAvatar, processProof } from "@/lib/images";
+import { admins, CATEGORIES, everyoneBut, push } from "@/lib/push";
 import { checkPassword, hashPassword, newToken, requireAdmin, requireUser } from "@/lib/auth";
 import { activeChallenge, checkInDeadline, loadBoard, mayJoin, type Challenge } from "@/lib/challenge";
 import { one, query } from "@/lib/db";
@@ -95,6 +97,8 @@ async function refereeSays(workoutId: number, verb: string): Promise<void> {
     [workoutId],
   );
   if (w) await query("insert into messages (user_id, body) values (null, $1)", [`${verb} ${sportLabel(w.sport).toLowerCase()}-økta til ${w.name} fra ${w.day}.`]);
+  const owner = await one<{ user_id: number }>("select user_id from workouts where id = $1", [workoutId]);
+  if (w && owner) after(() => push([owner.user_id], "checkin", { title: "Kontrolløren har sett på økta di", body: `${verb.replace(/^\S+ /, "")} ${sportLabel(w.sport).toLowerCase()}-økta fra ${w.day}.`, url: `/okt/${workoutId}` }));
 }
 
 export async function toggleRejected(id: number): Promise<void> {
@@ -117,6 +121,7 @@ export async function claimPaid(weeks: string[]): Promise<void> {
      on conflict (challenge_id, user_id, week_start) do nothing`,
     [c.id, user.id, weeks],
   );
+  after(async () => push(await admins(), "admin", { title: "💸 Meldt betalt", body: `${user.name} sier ${weeks.length * c.penalty_kr} kr er betalt – sjekk Vipps`, url: "/admin?fane=boter" }));
   revalidatePath("/", "layout");
 }
 
@@ -308,7 +313,13 @@ export async function deleteTask(id: number): Promise<void> {
 export async function toggleKudos(workoutId: number): Promise<void> {
   const user = await requireUser();
   const removed = await query("delete from kudos where workout_id = $1 and user_id = $2 returning 1", [workoutId, user.id]);
-  if (!removed.length) await query("insert into kudos (workout_id, user_id) values ($1, $2) on conflict do nothing", [workoutId, user.id]);
+  if (!removed.length) {
+    await query("insert into kudos (workout_id, user_id) values ($1, $2) on conflict do nothing", [workoutId, user.id]);
+    const w = await one<{ user_id: number; sport: string }>("select user_id, sport from workouts where id = $1", [workoutId]);
+    if (w && w.user_id !== user.id) {
+      after(() => push([w.user_id], "kudos", { title: `🔥 ${user.name} ga deg kudos`, body: `for ${sportLabel(w.sport).toLowerCase()}-økta di`, url: `/okt/${workoutId}`, tag: `kudos-${workoutId}` }));
+    }
+  }
   revalidatePath("/", "layout");
 }
 
@@ -318,6 +329,10 @@ export async function addComment(_: ActionState, form: FormData): Promise<Action
   const workoutId = int(form, "workout_id");
   if (!body || !workoutId) return { error: "Skriv noe først." };
   await query("insert into comments (workout_id, user_id, body) values ($1, $2, $3)", [workoutId, user.id, body]);
+  const owner = await one<{ user_id: number }>("select user_id from workouts where id = $1", [workoutId]);
+  if (owner && owner.user_id !== user.id) {
+    after(() => push([owner.user_id], "comments", { title: `💬 ${user.name} kommenterte økta di`, body: body.slice(0, 140), url: `/okt/${workoutId}` }));
+  }
   revalidatePath("/", "layout");
   return { ok: "" };
 }
@@ -333,6 +348,7 @@ export async function sendMessage(_: ActionState, form: FormData): Promise<Actio
   const body = String(form.get("body") ?? "").trim().slice(0, 2000);
   if (!body) return undefined;
   await query("insert into messages (user_id, body) values ($1, $2)", [user.id, body]);
+  after(async () => push(await everyoneBut(user.id), "chat", { title: "Garderoben", body: `${user.name.split(" ")[0]}: ${body.slice(0, 140)}`, url: "/prat", tag: "chat" }));
   await query("update users set chat_seen_at = now() where id = $1", [user.id]);
   revalidatePath("/prat");
   return { ok: "" };
@@ -452,7 +468,10 @@ export async function disableGroupLink(): Promise<void> {
 export async function approveUser(userId: number): Promise<void> {
   await requireAdmin();
   const u = await one<{ name: string }>("update users set approved = true where id = $1 and not approved returning name", [userId]);
-  if (u) await query("insert into messages (user_id, body) values (null, $1)", [`👋 ${u.name} er med i Svettebøtta!`]);
+  if (u) {
+    await query("insert into messages (user_id, body) values (null, $1)", [`👋 ${u.name} er med i Svettebøtta!`]);
+    after(() => push([userId], "test", { title: "Du er godkjent! 🎉", body: "Velkommen i Svettebøtta – trykk for å komme i gang.", url: "/velkommen" }));
+  }
   revalidatePath("/", "layout");
 }
 
@@ -461,4 +480,19 @@ export async function rejectUser(userId: number): Promise<void> {
   await requireAdmin();
   await query("delete from users where id = $1 and not approved", [userId]);
   revalidatePath("/", "layout");
+}
+
+// ---- Push notifications ----
+
+export async function setNotify(category: string, on: boolean): Promise<void> {
+  const user = await requireUser();
+  if (!(category in CATEGORIES)) return;
+  await query("update users set notify = notify || jsonb_build_object($2::text, $3::boolean) where id = $1", [user.id, category, on]);
+}
+
+export async function sendTestPush(): Promise<void> {
+  const user = await requireUser();
+  const subs = await one<{ n: number }>("select count(*)::int as n from push_subscriptions where user_id = $1", [user.id]);
+  if (!subs?.n) return;
+  await push([user.id], "test", { title: "Svettebøtta 💪", body: "Varsler virker! Nå får du beskjed om kudos, innsjekk og påminnelser.", url: "/meg", tag: "test" });
 }

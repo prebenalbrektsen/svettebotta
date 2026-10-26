@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { announceWeek } from "./announce";
+import { push } from "./push";
+import { sportLabel } from "./sports";
 import { one, query } from "./db";
 
 // Strava is the hub: Garmin, Apple Watch (via the Strava app), Polar, Suunto and Wahoo all sync
@@ -103,6 +105,15 @@ async function importActivity(userId: number, a: Activity): Promise<boolean> {
   );
   if (!rows[0]?.inserted) return false;
   await mergeManualDuplicate(userId, rows[0].id, a.start_date);
+  // Fresh workouts only (not the backlog fetched when someone first connects).
+  if (Date.now() - new Date(a.start_date).getTime() < 24 * 3600000) {
+    await push([userId], "checkin", {
+      title: `Ny økt fra Strava: ${sportLabel(a.sport_type)}`,
+      body: `${minutes} min – sjekk inn med bilde, så teller den.`,
+      url: "/logg",
+      tag: `checkin-${rows[0].id}`,
+    });
+  }
   return true;
 }
 

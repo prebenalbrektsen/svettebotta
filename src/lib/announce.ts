@@ -1,9 +1,12 @@
 import { activeChallenge, evaluateWeek, loadBoard, WORKOUT_COLUMNS, type WeeklyTask, type Workout } from "./challenge";
 import { one, query } from "./db";
+import { everyoneBut, push } from "./push";
 import { addDays, isoWeekNumber, mondayOf, osloDate } from "./time";
 
 async function post(eventKey: string, body: string): Promise<void> {
-  await query("insert into messages (user_id, body, event_key) values (null, $1, $2) on conflict (event_key) do nothing", [body, eventKey]);
+  const added = await query("insert into messages (user_id, body, event_key) values (null, $1, $2) on conflict (event_key) do nothing returning 1", [body, eventKey]);
+  // The app's own news («Ida har uka i boks», the Monday summary) goes out like a chat message.
+  if (added.length) await push(await everyoneBut(null), "chat", { title: "Svettebøtta", body, url: "/prat", tag: `sys-${eventKey}` });
 }
 
 /** Posts "X fullførte uka" in the chat the first time someone's current week is in the bag. */

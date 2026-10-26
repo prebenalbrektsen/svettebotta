@@ -1,3 +1,4 @@
+import { PushSettings } from "@/components/PushSettings";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { ConnectWithStrava } from "@/components/StravaBrand";
 import Link from "next/link";
@@ -52,6 +53,12 @@ export default async function WelcomePage() {
         <div className="flex items-center gap-3"><span className={step}>{stravaConfigured() ? 4 : 3}</span><h2 className="font-bold">Logg inn med Face ID</h2></div>
         <p className="text-sm text-muted">Slipp passordet neste gang – logg inn med ansiktet eller fingeren.</p>
         <AddPasskey />
+      </section>
+
+      <section className="card space-y-3 p-4">
+        <div className="flex items-center gap-3"><span className={step}>{stravaConfigured() ? 5 : 4}</span><h2 className="font-bold">Slå på varsler</h2></div>
+        <p className="text-sm text-muted">Få beskjed når noen heier på deg, når en økt venter på innsjekk – og søndag kveld hvis uka holder på å glippe.</p>
+        <PushSettings categories={{}} prefs={{}} compact />
       </section>
 
       <Link href="/" className="btn w-full">Ferdig – til forsiden</Link>
