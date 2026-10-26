@@ -496,3 +496,13 @@ export async function sendTestPush(): Promise<void> {
   if (!subs?.n) return;
   await push([user.id], "test", { title: "Svettebøtta 💪", body: "Varsler virker! Nå får du beskjed om kudos, innsjekk og påminnelser.", url: "/meg", tag: "test" });
 }
+
+/**
+ * Admin: remove someone who was invited but never set up their account (no password yet) –
+ * e.g. to let them join through the shared link instead. Real accounts can't be removed here.
+ */
+export async function removeInvite(userId: number): Promise<void> {
+  await requireAdmin();
+  await query("delete from users where id = $1 and password_hash is null and not is_admin", [userId]);
+  revalidatePath("/", "layout");
+}

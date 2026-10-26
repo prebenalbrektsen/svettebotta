@@ -9,7 +9,7 @@ import { query } from "@/lib/db";
 import { stravaConfigured, webhookStatus } from "@/lib/strava";
 import { ActivateWebhook } from "@/components/ActivateWebhook";
 import { addDays, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
-import { activateStravaWebhook, approveUser, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
+import { activateStravaWebhook, approveUser, removeInvite, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
 
 const TABS = [
   { id: "boter", label: "Bøter" },
@@ -80,8 +80,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   await requireAdmin();
   const c = await activeChallenge();
   const board = c ? await loadBoard(c) : null;
-  const allUsers = await query<{ id: number; name: string; email: string | null; invite_token: string | null; is_admin: boolean; strava: boolean; approved: boolean; created_at: Date }>(
-    "select id, name, email, invite_token, is_admin, strava_athlete_id is not null as strava, approved, created_at from users order by name",
+  const allUsers = await query<{ id: number; name: string; email: string | null; invite_token: string | null; is_admin: boolean; strava: boolean; approved: boolean; created_at: Date; activated: boolean }>(
+    "select id, name, email, invite_token, is_admin, strava_athlete_id is not null as strava, approved, created_at, password_hash is not null as activated from users order by name",
   );
   const users = allUsers.filter((u) => u.approved);
   const pending = allUsers.filter((u) => !u.approved);
@@ -289,7 +289,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         <ActionMenu
                           label={`Valg for ${u.name}`}
                           items={[
-                            { label: "Ny innloggingslenke (glemt passord)", action: newInvite.bind(null, u.id) },
+                            { label: u.activated ? "Ny innloggingslenke (glemt passord)" : "Ny invitasjonslenke", action: newInvite.bind(null, u.id) },
+                            ...(!u.activated ? [{ label: "Fjern invitasjonen", action: removeInvite.bind(null, u.id), danger: true }] : []),
                             ...(c ? [{ label: memberIds.has(u.id) ? `Ta ut av ${c.name}` : `Meld på ${c.name}`, action: toggleMember.bind(null, u.id) }] : []),
                           ]}
                         />
