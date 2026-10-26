@@ -11,7 +11,7 @@ import { activeChallenge, checkInDeadline, loadBoard, mayJoin, type Challenge } 
 import { one, query } from "@/lib/db";
 import { disconnectStrava, subscribeWebhook, syncStrava } from "@/lib/strava";
 import { sportLabel, WATER_SPORTS } from "@/lib/sports";
-import { addDays, formatDay, fromOsloLocal, mondayOf, osloDate } from "@/lib/time";
+import { addDays, formatDay, fromOsloLocal, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
 
 export type ActionState = { error?: string; ok?: string; link?: string } | undefined;
 
@@ -204,6 +204,8 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
     String(form.get("description") ?? "").trim() || null,
     Math.max(1, int(form, "long_session_counts") ?? 2),
     form.get("join_mode") === "selected" ? "selected" : "open",
+    int(form, "joker_every"),
+    Math.max(0, int(form, "joker_max") ?? 2),
   ];
   if (!values[0] || !values[1] || !values[2] || values[3] == null || !values[4] || !values[5]) return { error: "Fyll inn alle feltene." };
   if (values[2]! < values[1]!) return { error: "Sluttdato må være etter startdato." };
@@ -211,14 +213,14 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
     await query(
       `update challenges set name = $2, starts_on = $3, ends_on = $4, penalty_kr = $5, min_sessions = $6,
          session_minutes = $7, long_session_minutes = $8, vipps_info = $9, check_in_hours = $10, max_per_day = $11,
-         proof_required = $12, description = $13, long_session_counts = $14, join_mode = $15 where id = $1`,
+         proof_required = $12, description = $13, long_session_counts = $14, join_mode = $15, joker_every = $16, joker_max = $17 where id = $1`,
       [id, ...values],
     );
   } else {
     const c = await one<Challenge>(
       `insert into challenges (name, starts_on, ends_on, penalty_kr, min_sessions, session_minutes, long_session_minutes, vipps_info,
-         check_in_hours, max_per_day, proof_required, description, long_session_counts, join_mode)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning *`,
+         check_in_hours, max_per_day, proof_required, description, long_session_counts, join_mode, joker_every, joker_max)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) returning *`,
       values,
     );
     // Nobody is signed up automatically: everyone gets a «Bli med» card and opts in.
@@ -504,5 +506,25 @@ export async function sendTestPush(): Promise<void> {
 export async function removeInvite(userId: number): Promise<void> {
   await requireAdmin();
   await query("delete from users where id = $1 and password_hash is null and not is_admin", [userId]);
+  revalidatePath("/", "layout");
+}
+
+// ---- Jokers ----
+
+/** Spend a joker on one of your own unpaid weeks: the fine disappears. */
+export async function spendJoker(week: string): Promise<void> {
+  const user = await requireUser();
+  const c = await activeChallenge();
+  if (!c?.joker_every) return;
+  const board = await loadBoard(c);
+  const me = board.members.find((m) => m.id === user.id);
+  const r = me?.results.find((x) => x.week === week);
+  if (!me || !r || r.fine !== "owed" || me.jokers.available < 1) return;
+  await query(
+    `insert into fines (challenge_id, user_id, week_start, status) values ($1, $2, $3, 'joker')
+     on conflict (challenge_id, user_id, week_start) do update set status = 'joker', updated_at = now()`,
+    [c.id, user.id, week],
+  );
+  await query("insert into messages (user_id, body) values (null, $1)", [`🃏 ${user.name} brukte en joker for uke ${isoWeekNumber(week)}.`]);
   revalidatePath("/", "layout");
 }

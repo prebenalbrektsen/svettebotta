@@ -23,6 +23,7 @@ export function statusLabel(c: Challenge, r: WeekResult): { text: string; tone: 
   if (r.state === "done") {
     if (r.fine === "paid") return { text: "Betalt", tone: "muted" };
     if (r.fine === "waived") return { text: "Fritatt", tone: "muted" };
+    if (r.fine === "joker") return { text: "Joker brukt 🃏", tone: "muted" };
     if (r.fine === "claimed") return { text: "Meldt betalt", tone: "warn" };
     return { text: `Bot ${c.penalty_kr} kr`, tone: "bad" };
   }

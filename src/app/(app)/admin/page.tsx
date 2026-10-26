@@ -59,6 +59,17 @@ function ChallengeFields({ c }: { c?: Challenge }) {
         <input type="checkbox" name="proof_required" className="h-5 w-5 accent-[#ff4d1c]" defaultChecked={c ? c.proof_required : true} />
         Bilde påkrevd for å sjekke inn (også for Strava-økter)
       </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="label">🃏 Ekstra økter per joker – tomt = ingen jokere</span>
+          <input type="number" min={1} name="joker_every" className="field" defaultValue={c ? (c.joker_every ?? "") : 4} />
+        </label>
+        <label className="block">
+          <span className="label">Maks jokere per utfordring</span>
+          <input type="number" min={0} name="joker_max" className="field" defaultValue={c?.joker_max ?? 2} />
+        </label>
+      </div>
+      <p className="-mt-1 text-xs text-muted">Økter utover ukeskravet samles opp. En joker kan brukes i stedet for å betale én ukes bot.</p>
       <fieldset className="space-y-2">
         <legend className="label">Hvem kan bli med?</legend>
         <label className="flex items-center gap-2 text-sm"><input type="radio" name="join_mode" value="open" defaultChecked={(c?.join_mode ?? "open") === "open"} className="h-5 w-5 accent-[#ff4d1c]" /> Alle i appen kan melde seg på</label>
@@ -98,7 +109,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .filter((d) => d.weeks.length)
     .sort((a, b) => Number(b.weeks.some((w) => w.fine === "claimed")) - Number(a.weeks.some((w) => w.fine === "claimed")));
   const claimedCount = debtors.reduce((n, d) => n + d.weeks.filter((w) => w.fine === "claimed").length, 0);
-  const settled = (board?.members ?? []).flatMap((m) => m.results.filter((r) => r.fine === "paid" || r.fine === "waived").map((r) => ({ m, r })));
+  const settled = (board?.members ?? []).flatMap((m) => m.results.filter((r) => r.fine === "paid" || r.fine === "waived" || r.fine === "joker").map((r) => ({ m, r })));
 
   const { fane } = await searchParams;
   const webhook = fane === "regler" ? await webhookStatus().catch(() => null) : null;
@@ -195,7 +206,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <ul className="mt-2 space-y-1">
                     {settled.map(({ m, r }) => (
                       <li key={`${m.id}-${r.week}`} className="flex items-center justify-between gap-2">
-                        <span>{m.name} · uke {isoWeekNumber(r.week)} · {r.fine === "paid" ? "betalt" : "fritatt"}</span>
+                        <span>{m.name} · uke {isoWeekNumber(r.week)} · {r.fine === "paid" ? "betalt" : r.fine === "joker" ? "joker 🃏" : "fritatt"}</span>
                         <form action={setFine.bind(null, m.id, r.week, "owed")}><button className="text-xs underline">Angre</button></form>
                       </li>
                     ))}

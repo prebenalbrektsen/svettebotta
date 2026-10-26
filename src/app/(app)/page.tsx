@@ -1,3 +1,4 @@
+import { spendJoker } from "./actions";
 import { Count } from "@/components/Count";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import Link from "next/link";
@@ -139,6 +140,12 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
             </div>
           </div>
           {myWeek.hasLong && <p className="mt-2 text-xs text-muted">Langøkt teller ×{c.long_session_counts}.</p>}
+          {me.jokers.enabled && (
+            <p className="mt-1 text-xs font-semibold text-muted">
+              🃏 {me.jokers.available} {me.jokers.available === 1 ? "joker" : "jokere"}
+              {me.jokers.earned < me.jokers.max ? ` · ${me.jokers.toNext}/${me.jokers.every} ekstra økter mot neste` : " · maks opptjent"}
+            </p>
+          )}
           {task && <p className="mt-1 text-xs text-muted">Ukeskrav «{task.title}»: {myWeek.taskMet ? "✓ oppfylt" : "ikke ennå"}</p>}
           {myPending > 0 ? (
             <Link href="/logg" className="btn btn-heat mt-3 w-full">Sjekk inn {myPending === 1 ? "økta" : `${myPending} økter`} {c.check_in_hours ? `(innen ${c.check_in_hours} t)` : ""}</Link>
@@ -166,6 +173,16 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
             {vippsLink ? " Betal i Vipps, og trykk så «Jeg har betalt»." : c.vipps_info ? ` Vipps til ${c.vipps_info}.` : " Vipps til bøtekassa."}
           </p>
           <div className="mt-3 flex flex-col gap-2">
+            {me && me.jokers.available > 0 && (
+              <div className="rounded-xl bg-white/15 p-3">
+                <p className="text-sm font-semibold">Du har {me.jokers.available} {me.jokers.available === 1 ? "joker" : "jokere"} 🃏 – bruk en i stedet for å betale:</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {owedWeeks.slice(0, me.jokers.available).map((w) => (
+                    <form key={w} action={spendJoker.bind(null, w)}><button className="btn btn-sm bg-paper text-ink">Bruk joker for uke {isoWeekNumber(w)}</button></form>
+                  ))}
+                </div>
+              </div>
+            )}
             {vippsLink && (
               <a href={vippsLink} target="_blank" rel="noopener noreferrer" className="btn w-full bg-[#ff5b24] text-white">
                 Betal {owedWeeks.length * c.penalty_kr} kr med Vipps

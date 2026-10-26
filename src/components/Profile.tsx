@@ -51,6 +51,7 @@ export function Records({ p }: { p: PersonStats }) {
     longestRun ? { label: "Lengste løpetur", value: `${fmtKm(longestRun.distance_m! / 1000)} km`, href: `/okt/${longestRun.id}` } : null,
     bestWeek && bestWeek.minutes > 0 ? { label: "Beste uke", value: formatMinutes(bestWeek.minutes), sub: `uke ${isoWeekNumber(bestWeek.week)}` } : null,
     { label: "Kudos fått", value: `${p.kudosReceived} 🔥`, sub: `${p.kudosGiven} gitt` },
+    m.jokers.enabled ? { label: "Jokere", value: `${m.jokers.available} 🃏`, sub: m.jokers.earned < m.jokers.max ? `${m.jokers.toNext}/${m.jokers.every} mot neste` : `maks ${m.jokers.max} opptjent` } : null,
   ].filter(Boolean) as { label: string; value: string; sub?: string; href?: string }[];
   return (
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">

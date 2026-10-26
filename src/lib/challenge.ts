@@ -17,7 +17,34 @@ export type Challenge = {
   proof_required: boolean;
   description: string | null;
   join_mode: "open" | "selected";
+  joker_every: number | null;
+  joker_max: number;
 };
+
+export type Jokers = { enabled: boolean; earned: number; used: number; available: number; extra: number; toNext: number; every: number; max: number };
+
+/**
+ * Jokers: workouts that count beyond the weekly requirement add up; every `joker_every` of them
+ * earns one joker, at most `joker_max` per challenge. A joker clears one week's fine.
+ */
+export function jokersFor(c: Challenge, results: WeekResult[]): Jokers {
+  const every = c.joker_every ?? 0;
+  const extra = results
+    .filter((r) => r.state === "done" || r.state === "running")
+    .reduce((n, r) => n + Math.max(0, r.qualifying - c.min_sessions), 0);
+  const earned = every > 0 ? Math.min(Math.floor(extra / every), c.joker_max) : 0;
+  const used = results.filter((r) => r.fine === "joker").length;
+  return {
+    enabled: every > 0,
+    earned,
+    used,
+    available: Math.max(0, earned - used),
+    extra,
+    toNext: every > 0 && earned < c.joker_max ? extra % every : 0,
+    every,
+    max: c.joker_max,
+  };
+}
 
 /** Whether this person may sign up: everyone when the challenge is open, else only those the admin picked. */
 export async function mayJoin(c: Challenge, userId: number): Promise<boolean> {
@@ -55,7 +82,7 @@ export type WorkoutStatus = "counts" | "pending" | "expired" | "short" | "sameda
 
 
 export type WeeklyTask = { id: number; week_start: string; title: string; description: string | null; auto_sports: string[] };
-export type FineStatus = "owed" | "claimed" | "paid" | "waived";
+export type FineStatus = "owed" | "claimed" | "paid" | "waived" | "joker";
 export type Member = { id: number; name: string; color: string; strava_athlete_id: string | null; is_admin: boolean; joined_at: Date; avatar_v: number | null };
 
 export type WeekResult = {
@@ -98,6 +125,7 @@ export function ruleParts(c: Challenge): string[] {
   if (c.max_per_day) parts.push(c.max_per_day === 1 ? "maks 1 økt per dag" : `maks ${c.max_per_day} økter per dag`);
   parts.push(c.check_in_hours ? `sjekk inn innen ${c.check_in_hours} t` : "sjekk inn før uka er over");
   if (c.proof_required) parts.push("bilde påkrevd");
+  if (c.joker_every) parts.push(`${c.joker_every} ekstra økter = 🃏 joker (maks ${c.joker_max})`);
   parts.push(`bot ${c.penalty_kr} kr`);
   return parts;
 }
@@ -196,6 +224,7 @@ export type Board = {
     owedKr: number;
     claimedKr: number;
     paidKr: number;
+    jokers: Jokers;
     workouts: Workout[];
   })[];
 };
@@ -244,7 +273,7 @@ export async function loadBoard(c: Challenge): Promise<Board> {
         return { ...r, fine };
       });
       const sum = (status: FineStatus) => results.filter((r) => r.fine === status).length * c.penalty_kr;
-      return { ...m, results, workouts: mine, owedKr: sum("owed"), claimedKr: sum("claimed"), paidKr: sum("paid") };
+      return { ...m, results, workouts: mine, owedKr: sum("owed"), claimedKr: sum("claimed"), paidKr: sum("paid"), jokers: jokersFor(c, results) };
     }),
   };
 }
