@@ -1,3 +1,4 @@
+import { CelebrationPreview } from "@/components/Celebrate";
 import Link from "next/link";
 import { ActionForm, CopyLink } from "@/components/ActionForm";
 import { AddParticipantForm } from "@/components/AddParticipantForm";
@@ -323,6 +324,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
           {tab === "regler" && (
             <>
+              <section className="card space-y-2 p-4">
+                <h2 className="font-bold">Forhåndsvis feiringer</h2>
+                <p className="text-sm text-muted">Slik ser det ut når noen sparer en joker eller får et nytt merke.</p>
+                <CelebrationPreview jokers={{ held: 1, max: c.joker_max, every: c.joker_every ?? 1 }} />
+              </section>
               <section className="card space-y-2 p-4">
                 <h2 className="font-bold">Strava</h2>
                 {!stravaConfigured() ? (

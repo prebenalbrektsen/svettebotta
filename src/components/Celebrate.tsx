@@ -14,26 +14,45 @@ function burst() {
   setTimeout(() => confetti({ particleCount: 60, spread: 120, origin: { y: 0.35 }, colors: COLORS, disableForReducedMotion: true, zIndex: 70 }), 250);
 }
 
-/** The joker as a playing card. */
+const face: React.CSSProperties = { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" };
+const back: React.CSSProperties = { ...face, transform: "rotateY(180deg)" };
+
+/** The joker as a two-sided playing card: the face, and a dark back with the bucket. */
 export function JokerCard({ small }: { small?: boolean }) {
-  const size = small ? "h-40 w-28 rounded-xl p-2" : "h-80 w-56 rounded-[22px] p-3";
+  const size = small ? "h-40 w-28 rounded-xl" : "h-80 w-56 rounded-[22px]";
   return (
-    <div className={`relative ${size} border-4 border-white bg-gradient-to-br from-[#ff7a4d] via-[#ff4d1c] to-[#c2410c] text-white shadow-2xl`}>
-      <span className={`absolute ${small ? "top-1.5 left-2 text-sm" : "top-2.5 left-3.5 text-2xl"} display leading-none`}>J<br /><span className="text-[0.7em]">🃏</span></span>
-      <span className={`absolute ${small ? "right-2 bottom-1.5 text-sm" : "right-3.5 bottom-2.5 text-2xl"} display rotate-180 leading-none`}>J<br /><span className="text-[0.7em]">🃏</span></span>
-      <div className="flex h-full flex-col items-center justify-center gap-3 rounded-[14px] border-2 border-white/50">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon-512.png" alt="" className={`${small ? "h-12 w-12 rounded-lg" : "h-24 w-24 rounded-2xl"} shadow-lg ring-4 ring-white/80`} />
-        <span className={`display ${small ? "text-xl" : "text-4xl"} tracking-wide`}>Joker</span>
+    <div className={`relative ${size}`} style={{ transformStyle: "preserve-3d" }}>
+      <div style={face} className={`absolute inset-0 ${size} border-4 border-white bg-gradient-to-br from-[#ff7a4d] via-[#ff4d1c] to-[#c2410c] p-3 text-white shadow-2xl`}>
+        <span className={`absolute ${small ? "top-1.5 left-2 text-sm" : "top-2.5 left-3.5 text-2xl"} display leading-none`}>J</span>
+        <span className={`absolute ${small ? "right-2 bottom-1.5 text-sm" : "right-3.5 bottom-2.5 text-2xl"} display rotate-180 leading-none`}>J</span>
+        <div className="flex h-full flex-col items-center justify-center gap-3 rounded-[14px] border-2 border-white/50">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-512.png" alt="" className={`${small ? "h-12 w-12 rounded-lg" : "h-24 w-24 rounded-2xl"} shadow-lg ring-4 ring-white/80`} />
+          <span className={`display ${small ? "text-xl" : "text-4xl"} tracking-wide`}>Joker</span>
+        </div>
+      </div>
+      <div style={back} className={`absolute inset-0 ${size} border-4 border-white bg-[#14130f] p-3 shadow-2xl`}>
+        <div className="grid h-full place-items-center rounded-[14px] border-2 border-[#ff4d1c]/60 bg-[repeating-linear-gradient(45deg,#1f1d18_0_10px,#14130f_10px_20px)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-512.png" alt="" className={`${small ? "h-10 w-10 rounded-lg" : "h-20 w-20 rounded-2xl"} opacity-90`} />
+        </div>
       </div>
     </div>
   );
 }
 
+/** A two-sided gold medal: the badge's emoji in front, the bucket on the back. */
 function BadgeMedal({ emoji }: { emoji: string }) {
+  const disc = "absolute inset-0 grid place-items-center rounded-full border-[6px] border-white bg-gradient-to-br from-[#ffd36b] via-[#ffb03b] to-[#ff7a1f] shadow-2xl";
   return (
-    <div className="grid h-52 w-52 place-items-center rounded-full border-[6px] border-white bg-gradient-to-br from-[#ffd36b] via-[#ffb03b] to-[#ff7a1f] shadow-2xl">
-      <div className="grid h-40 w-40 place-items-center rounded-full bg-white/25 text-7xl ring-2 ring-white/60">{emoji}</div>
+    <div className="relative h-52 w-52" style={{ transformStyle: "preserve-3d" }}>
+      <div style={face} className={disc}>
+        <div className="grid h-40 w-40 place-items-center rounded-full bg-white/25 text-7xl ring-2 ring-white/60">{emoji}</div>
+      </div>
+      <div style={back} className={disc}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon-512.png" alt="" className="h-24 w-24 rounded-3xl ring-4 ring-white/70" />
+      </div>
     </div>
   );
 }
@@ -82,12 +101,17 @@ function Spin({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ perspective: 1000 }}>
       <motion.div
-        initial={{ rotateY: -540, scale: 0.3, opacity: 0, y: 40 }}
+        initial={{ rotateY: -720, scale: 0.3, opacity: 0, y: 60 }}
         animate={{ rotateY: 0, scale: 1, opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 55, damping: 11, mass: 1 }}
+        transition={{
+          rotateY: { duration: 1.5, ease: [0.16, 1, 0.3, 1] },
+          scale: { type: "spring", stiffness: 110, damping: 11 },
+          y: { type: "spring", stiffness: 110, damping: 13 },
+          opacity: { duration: 0.25 },
+        }}
         style={{ transformStyle: "preserve-3d" }}
       >
-        <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1.4 }}>
+        <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1.6 }} style={{ transformStyle: "preserve-3d" }}>
           {children}
         </motion.div>
       </motion.div>
@@ -120,6 +144,14 @@ export function Celebrations({ userId, challengeId, jokers, badges }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, challengeId, jokers.earnedTotal, badges.map((b) => b.id).join(",")]);
 
+  return <CelebrationQueue queue={queue} setQueue={setQueue} jokers={jokers} />;
+}
+
+function CelebrationQueue({ queue, setQueue, jokers }: {
+  queue: Item[];
+  setQueue: React.Dispatch<React.SetStateAction<Item[]>>;
+  jokers: { held: number; max: number; every: number };
+}) {
   const current = queue[0];
   useEffect(() => { if (current) burst(); }, [current]);
   const next = () => setQueue((q) => q.slice(1));
@@ -152,6 +184,18 @@ export function Celebrations({ userId, challengeId, jokers, badges }: {
         </Dialog>
       )}
     </AnimatePresence>
+  );
+}
+
+/** Admin: show the celebrations on demand, to see (or show off) how they look. */
+export function CelebrationPreview({ jokers }: { jokers: { held: number; max: number; every: number } }) {
+  const [queue, setQueue] = useState<Item[]>([]);
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setQueue([{ kind: "joker", count: 1 }])}>🃏 Ny joker</button>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setQueue([{ kind: "badge", id: "preview", title: "Morgenfugl", emoji: "🌅", how: "5 økter startet før kl. 7" }])}>🏅 Nytt merke</button>
+      <CelebrationQueue queue={queue} setQueue={setQueue} jokers={jokers} />
+    </div>
   );
 }
 
