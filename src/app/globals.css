@@ -64,6 +64,31 @@ body {
   .tab-lens { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08); }
 }
 
+/* Under the tab bar: content fades into a blur that gets stronger towards the bottom edge, like
+   iOS. Three stacked layers with rising blur, each masked to its own band, make it gradual. */
+.bottom-blur {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  height: calc(118px + env(safe-area-inset-bottom));
+  pointer-events: none;
+  z-index: 15;
+}
+.bottom-blur > span { position: absolute; inset: 0; }
+.bottom-blur > span:nth-child(1) {
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%); mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+}
+.bottom-blur > span:nth-child(2) {
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 25%, black 60%); mask-image: linear-gradient(to bottom, transparent 25%, black 60%);
+}
+.bottom-blur > span:nth-child(3) {
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 50%, black 90%); mask-image: linear-gradient(to bottom, transparent 50%, black 90%);
+  background: linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--color-paper) 55%, transparent));
+}
+
 /* Front page: cards rise in one after another. */
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 .stagger > * { animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }

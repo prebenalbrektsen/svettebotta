@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
+import { useEffect } from "react";
 
 const LINKS = [
   { href: "/", label: "Uka", icon: "M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" },
@@ -14,13 +15,20 @@ const LINKS = [
 const ADMIN = { href: "/admin", label: "Admin", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7.1 19.7l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3.1 14H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.3 7.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" };
 const spring = { type: "spring", stiffness: 500, damping: 38 } as const;
 
-export function NavLinks({ isAdmin, mobile, unread = 0, onStrava, adminBadge = 0 }: { isAdmin: boolean; mobile?: boolean; unread?: number; onStrava?: boolean; adminBadge?: number }) {
+export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null }: { isAdmin: boolean; mobile?: boolean; badges?: Record<string, number>; onStrava?: boolean; avatar?: string | null }) {
   const path = usePathname();
   // On Strava the watch logs for you, so the tab is a list of workouts, not a form.
   const base = onStrava ? LINKS.map((l) => (l.href === "/logg" ? { ...l, label: "Økter", icon: "M22 12h-4l-3 9L9 3l-3 9H2" } : l)) : LINKS;
   const links = isAdmin ? [...base, ADMIN] : base;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
-  const counts: Record<string, number> = { "/prat": unread, "/admin": adminBadge };
+  const counts = badges;
+  // The red number on the home-screen icon: the same things the tab badges show.
+  const total = Object.values(badges).reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    if (!mobile) return;
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    (total > 0 ? nav.setAppBadge?.(total) : nav.clearAppBadge?.())?.catch(() => {});
+  }, [total, mobile]);
   const badge = (href: string) =>
     counts[href] > 0 && !active(href) ? (
       <motion.span
@@ -43,7 +51,13 @@ export function NavLinks({ isAdmin, mobile, unread = 0, onStrava, adminBadge = 0
             <Link href={l.href} className={`relative flex flex-col items-center gap-0.5 rounded-[24px] py-1.5 text-[10.5px] font-semibold transition-colors ${active(l.href) ? "text-heat" : "text-ink/70"}`}>
               <motion.span whileTap={{ scale: 0.82 }} transition={spring} className="relative">
                 {badge(l.href)}
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={active(l.href) ? 2.3 : 2} strokeLinecap="round" strokeLinejoin="round"><path d={l.icon} /></svg>
+                {l.href === "/meg" && avatar ? (
+                  // Your own picture as the «Meg» icon, ringed when you're there.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatar} alt="" className={`h-6 w-6 rounded-full object-cover ${active(l.href) ? "ring-2 ring-heat ring-offset-1 ring-offset-transparent" : ""}`} />
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={active(l.href) ? 2.3 : 2} strokeLinecap="round" strokeLinejoin="round"><path d={l.icon} /></svg>
+                )}
               </motion.span>
               {l.label}
             </Link>
