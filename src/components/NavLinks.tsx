@@ -22,6 +22,12 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
   const links = isAdmin ? [...base, ADMIN] : base;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   const counts = badges;
+  // Tapping the tab you're already on scrolls back to the top, like iOS.
+  const onTabClick = (href: string) => (e: React.MouseEvent) => {
+    if (path !== href) return;
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const listRef = useRef<HTMLUListElement | null>(null);
   const items = useRef<(HTMLLIElement | null)[]>([]);
   const [lens, setLens] = useState<{ x: number; w: number } | null>(null);
@@ -73,7 +79,7 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
         )}
         {links.map((l, i) => (
           <li key={l.href} ref={(el) => { items.current[i] = el; }} className="relative flex-1">
-            <Link href={l.href} className={`relative flex flex-col items-center gap-0.5 rounded-[24px] py-1.5 text-[10.5px] font-semibold transition-colors ${active(l.href) ? "text-heat" : "text-ink/70"}`}>
+            <Link href={l.href} onClick={onTabClick(l.href)} className={`relative flex flex-col items-center gap-0.5 rounded-[24px] py-1.5 text-[10.5px] font-semibold transition-colors ${active(l.href) ? "text-heat" : "text-ink/70"}`}>
               <motion.span whileTap={{ scale: 0.82 }} transition={spring} className="relative">
                 {badge(l.href)}
                 {l.href === "/meg" && avatar ? (
@@ -96,7 +102,7 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
       {links.map((l) => (
         <li key={l.href} className="relative">
           {active(l.href) && <motion.span layoutId="top-lens" transition={spring} className="absolute inset-0 rounded-full bg-ink" />}
-          <Link href={l.href} className={`relative block rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${active(l.href) ? "text-paper" : "text-muted hover:text-ink"}`}>
+          <Link href={l.href} onClick={onTabClick(l.href)} className={`relative block rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${active(l.href) ? "text-paper" : "text-muted hover:text-ink"}`}>
             {l.label}{badge(l.href)}
           </Link>
         </li>
