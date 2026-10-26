@@ -430,6 +430,7 @@ export async function toggleInvite(challengeId: number, userId: number): Promise
 export async function activateStravaWebhook(): Promise<ActionState> {
   await requireAdmin();
   const r = await subscribeWebhook();
+  if (r.ok) await query("insert into settings (key, value) values ('strava_webhook', '1') on conflict (key) do nothing");
   revalidatePath("/admin");
   return r.ok ? { ok: r.message } : { error: r.message };
 }

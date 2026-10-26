@@ -1,3 +1,4 @@
+import { LiveRefresh } from "@/components/LiveRefresh";
 import { Avatar } from "@/components/Avatar";
 import { ChatBox, ScrollToEnd } from "@/components/ChatBox";
 import { RoleTag } from "@/components/RoleTag";
@@ -54,8 +55,9 @@ export default async function ChatPage() {
         })}
         {!messages.length && <li className="py-8 text-center text-muted">Ingen meldinger ennå. Skryt, mas og trash talk hører hjemme her – appen melder også fra når noen har uka i boks.</li>}
       </ul>
-      <ScrollToEnd />
+      <ScrollToEnd count={messages.length} />
       <ChatBox />
+      <LiveRefresh what="prat" />
     </div>
   );
 }

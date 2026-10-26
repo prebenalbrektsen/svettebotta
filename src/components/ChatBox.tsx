@@ -1,22 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { sendMessage } from "@/app/(app)/actions";
 
-/** Message input pinned above the tab bar, plus a quiet refresh so new messages appear by themselves. */
+/** Message input pinned above the tab bar. New messages arrive through <LiveRefresh what="prat" />. */
 export function ChatBox() {
   const [state, action, pending] = useActionState(sendMessage, undefined);
   const form = useRef<HTMLFormElement>(null);
-  const router = useRouter();
   useEffect(() => {
     if (state?.ok !== undefined) form.current?.reset();
     window.scrollTo({ top: document.body.scrollHeight });
   }, [state]);
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 8000);
-    return () => clearInterval(t);
-  }, [router]);
   return (
     <form
       ref={form}
@@ -45,7 +39,13 @@ export function ChatBox() {
   );
 }
 
-export function ScrollToEnd() {
-  useEffect(() => { window.scrollTo({ top: document.body.scrollHeight }); }, []);
+/** Jumps to the newest message on open, and follows new ones if you were already near the bottom. */
+export function ScrollToEnd({ count }: { count: number }) {
+  const first = useRef(true);
+  useEffect(() => {
+    const nearBottom = window.innerHeight + window.scrollY > document.body.scrollHeight - 400;
+    if (first.current || nearBottom) window.scrollTo({ top: document.body.scrollHeight, behavior: first.current ? "auto" : "smooth" });
+    first.current = false;
+  }, [count]);
   return null;
 }

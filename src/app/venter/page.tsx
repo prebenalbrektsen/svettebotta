@@ -1,6 +1,6 @@
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { redirect } from "next/navigation";
-import { AutoRefresh } from "@/components/AutoRefresh";
+import { LiveRefresh } from "@/components/LiveRefresh";
 import { Logo } from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
 import { logout } from "../auth-actions";
@@ -19,7 +19,7 @@ export default async function WaitingPage() {
         <form action={logout}><button className="text-sm font-semibold text-muted underline">Logg ut</button></form>
       </div>
       <div className="mt-4"><InstallPrompt /></div>
-      <AutoRefresh seconds={15} />
+      <LiveRefresh what="godkjent" />
     </main>
   );
 }

@@ -33,12 +33,16 @@ export async function announceWeek(userId: number): Promise<void> {
 }
 
 /** Once a week is over: a short summary of who made it and what went in the bucket. */
+// Remembered per server instance, so the summary check doesn't touch the database on every page view.
+let summaryDoneFor = "";
+
 export async function announceWeekSummary(): Promise<void> {
+  const lastWeek = addDays(mondayOf(osloDate()), -7);
+  if (summaryDoneFor === lastWeek) return;
   const c = await activeChallenge();
   if (!c) return;
-  const lastWeek = addDays(mondayOf(osloDate()), -7);
-  if (lastWeek < mondayOf(c.starts_on) || lastWeek > c.ends_on) return;
-  if (await one("select 1 from messages where event_key = $1", [`summary:${c.id}:${lastWeek}`])) return;
+  if (lastWeek < mondayOf(c.starts_on) || lastWeek > c.ends_on) { summaryDoneFor = lastWeek; return; }
+  if (await one("select 1 from messages where event_key = $1", [`summary:${c.id}:${lastWeek}`])) { summaryDoneFor = lastWeek; return; }
   const board = await loadBoard(c);
   const i = board.weeks.indexOf(lastWeek);
   if (i < 0) return;
@@ -51,4 +55,5 @@ export async function announceWeekSummary(): Promise<void> {
     ? `🏁 Uke ${isoWeekNumber(lastWeek)} er over: ${made} av ${counted.length} klarte det. ${failed.map((m) => m.name).join(", ")} spytter ${c.penalty_kr} kr i bøtta. 💸`
     : `🏁 Uke ${isoWeekNumber(lastWeek)} er over: ALLE klarte det! Bøtta sulter. 🔥`;
   await post(`summary:${c.id}:${lastWeek}`, body);
+  summaryDoneFor = lastWeek;
 }

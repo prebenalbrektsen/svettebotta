@@ -102,6 +102,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { fane } = await searchParams;
   const webhook = fane === "regler" ? await webhookStatus().catch(() => null) : null;
+  // Remember it, so the background Strava check can relax (see lib/autosync.ts).
+  if (webhook) await query("insert into settings (key, value) values ('strava_webhook', '1') on conflict (key) do nothing");
   const connected = users.filter((u) => u.strava).length;
   const tab = TABS.some((t) => t.id === fane) ? fane! : pending.length ? "deltakere" : claimedCount || debtors.length ? "boter" : "deltakere";
 
