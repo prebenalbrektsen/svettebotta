@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const LINKS = [
   { href: "/", label: "Uka", icon: "M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" },
@@ -22,6 +22,20 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
   const links = isAdmin ? [...base, ADMIN] : base;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   const counts = badges;
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const items = useRef<(HTMLLIElement | null)[]>([]);
+  const [lens, setLens] = useState<{ x: number; w: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!mobile) return;
+    const measure = () => {
+      const el = items.current[links.findIndex((l) => active(l.href))];
+      if (el) setLens({ x: el.offsetLeft, w: el.offsetWidth });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, links.length, mobile]);
   // The red number on the home-screen icon: the same things the tab badges show.
   const total = Object.values(badges).reduce((a, b) => a + b, 0);
   useEffect(() => {
@@ -43,11 +57,22 @@ export function NavLinks({ isAdmin, mobile, badges = {}, onStrava, avatar = null
 
   if (mobile) {
     // iOS-style glass tab bar: a floating, frosted pill with a lens that slides to the active tab.
+    // The lens is ONE element moved sideways, measured inside the bar (offsetLeft) – shared-layout
+    // animations measure against the page and fly in from below when a tab switch also scrolls.
+    const activeIndex = links.findIndex((l) => active(l.href));
     return (
-      <ul className="glass flex items-stretch gap-0.5 rounded-[30px] p-1.5">
-        {links.map((l) => (
-          <li key={l.href} className="relative flex-1">
-            {active(l.href) && <motion.span layoutId="tab-lens" transition={spring} className="tab-lens absolute inset-0 rounded-[24px]" />}
+      <ul ref={listRef} className="glass relative flex items-stretch gap-0.5 rounded-[30px] p-1.5">
+        {lens && (
+          <motion.span
+            aria-hidden="true"
+            className="tab-lens absolute top-1.5 bottom-1.5 left-0 rounded-[24px]"
+            initial={false}
+            animate={{ x: lens.x, width: lens.w, opacity: activeIndex >= 0 ? 1 : 0 }}
+            transition={spring}
+          />
+        )}
+        {links.map((l, i) => (
+          <li key={l.href} ref={(el) => { items.current[i] = el; }} className="relative flex-1">
             <Link href={l.href} className={`relative flex flex-col items-center gap-0.5 rounded-[24px] py-1.5 text-[10.5px] font-semibold transition-colors ${active(l.href) ? "text-heat" : "text-ink/70"}`}>
               <motion.span whileTap={{ scale: 0.82 }} transition={spring} className="relative">
                 {badge(l.href)}
