@@ -1,3 +1,4 @@
+import { ConnectWithStrava } from "@/components/StravaBrand";
 import Link from "next/link";
 import { JoinCard } from "@/components/JoinCard";
 import { WatchGuide } from "@/components/WatchGuide";
@@ -35,7 +36,7 @@ export default async function WelcomePage() {
         <section className="card space-y-3 p-4">
           <div className="flex items-center gap-3"><span className={step}>2</span><h2 className="font-bold">Koble til Strava</h2></div>
           <p className="text-sm text-muted">Da kommer øktene fra klokka inn av seg selv – du sjekker dem bare inn med et bilde.</p>
-          {user.strava_athlete_id ? <p className="font-semibold text-ok">✓ Koblet til</p> : <a href="/api/strava/connect" className="btn btn-heat w-full">Koble til Strava</a>}
+          {user.strava_athlete_id ? <p className="font-semibold text-ok">✓ Koblet til</p> : <ConnectWithStrava />}
           <WatchGuide />
         </section>
       )}

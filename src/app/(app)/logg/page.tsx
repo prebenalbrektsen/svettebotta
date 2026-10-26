@@ -1,3 +1,4 @@
+import { ConnectWithStrava, PoweredByStrava } from "@/components/StravaBrand";
 import { LogForm } from "@/components/LogForm";
 import { SyncButton } from "@/components/SyncButton";
 import { WorkoutRow } from "@/components/WorkoutRow";
@@ -76,6 +77,7 @@ export default async function LogPage() {
           {form}
         </details>
         <WatchGuide />
+        <div className="flex justify-center pb-2"><PoweredByStrava /></div>
       </div>
     );
   }
@@ -84,10 +86,10 @@ export default async function LogPage() {
     <div className="space-y-4 pt-2">
       <h1 className="display text-5xl">Logg økt</h1>
       {stravaConfigured() && (
-        <section className="rounded-2xl bg-[#fc4c02] p-4 text-white">
+        <section className="card p-4">
           <p className="display text-2xl">Slipp å taste inn</p>
-          <p className="mt-1 text-sm opacity-90">Koble til Strava, så kommer øktene fra Garmin, Apple Watch og andre klokker inn av seg selv – med tid, distanse og puls.</p>
-          <a href="/api/strava/connect" className="btn mt-3 bg-white text-[#fc4c02]">Koble til Strava</a>
+          <p className="mt-1 mb-3 text-sm text-muted">Koble til Strava, så kommer øktene fra Garmin, Apple Watch og andre klokker inn av seg selv – med tid, distanse og puls. Du sjekker dem bare inn med et bilde.</p>
+          <ConnectWithStrava />
         </section>
       )}
       {stravaConfigured() && <WatchGuide />}

@@ -1,3 +1,4 @@
+import { PoweredByStrava } from "@/components/StravaBrand";
 import Link from "next/link";
 import { BackLink } from "@/components/BackLink";
 import { Icon } from "@/components/Icon";
@@ -88,7 +89,10 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
         <img src={`/api/bilde/${w.id}`} alt="Dokumentasjon" className="w-full rounded-2xl border border-line" />
       )}
       {w.source === "strava" && w.strava_id && (
-        <a href={`https://www.strava.com/activities/${w.strava_id}`} target="_blank" className="inline-block text-sm font-semibold text-[#fc4c02]">Se økta på Strava →</a>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <a href={`https://www.strava.com/activities/${w.strava_id}`} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-[#FC5200] underline">View on Strava</a>
+          <PoweredByStrava />
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-3">

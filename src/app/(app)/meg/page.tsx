@@ -1,3 +1,4 @@
+import { ConnectWithStrava, PoweredByStrava } from "@/components/StravaBrand";
 import { logout } from "@/app/auth-actions";
 import { stravaDisconnect } from "../actions";
 import { AvatarUpload } from "@/components/AvatarUpload";
@@ -64,9 +65,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <>
               <SyncButton />
               <form action={stravaDisconnect}><button className="btn btn-ghost btn-sm">Koble fra</button></form>
+              <PoweredByStrava className="mt-1 block w-full" />
             </>
           ) : stravaConfigured() ? (
-            <a href="/api/strava/connect" className="btn btn-sm bg-[#fc4c02] text-white">Koble til Strava</a>
+            <ConnectWithStrava />
           ) : (
             <p className="text-sm text-warn">Strava er ikke satt opp i appen ennå.</p>
           )}
