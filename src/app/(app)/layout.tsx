@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 import { Logo } from "@/components/Logo";
+import { MenuCloser } from "@/components/MenuCloser";
 import { NavLinks } from "@/components/NavLinks";
 import { requireUser } from "@/lib/auth";
 import { announceWeekSummary } from "@/lib/announce";
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="hidden sm:block"><NavLinks isAdmin={user.is_admin} unread={unread!.n} onStrava={!!user.strava_athlete_id} adminBadge={pendingUsers} /></div>
       </header>
       <main className="px-4">{children}</main>
+      <MenuCloser />
       <nav className="tab-bar fixed inset-x-0 bottom-0 z-20 border-t border-line bg-card/95 backdrop-blur sm:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <NavLinks isAdmin={user.is_admin} unread={unread!.n} onStrava={!!user.strava_athlete_id} adminBadge={pendingUsers} mobile />
       </nav>

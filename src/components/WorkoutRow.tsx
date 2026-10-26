@@ -104,7 +104,7 @@ export function WorkoutRow({
             </form>
           )}
           {menu && (
-            <details className="relative">
+            <details data-menu className="relative">
               <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full bg-line/60 text-muted" aria-label="Flere valg">
                 <Icon name="more" className="h-4 w-4" />
               </summary>
