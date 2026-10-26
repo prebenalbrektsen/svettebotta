@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { WorkoutRow } from "@/components/WorkoutRow";
+import { FeedCard } from "@/components/FeedCard";
 import type { Board, Challenge } from "@/lib/challenge";
 import { dayHeading, mondayOf, osloDate } from "@/lib/time";
 
 /** Everyone's checked-in workouts, newest first, grouped by day like a feed. */
-export function AllWorkouts({ c, board, me, isAdmin }: { c: Challenge; board: Board; me: number; isAdmin: boolean }) {
+export function AllWorkouts({ c, board, me }: { c: Challenge; board: Board; me: number; isAdmin?: boolean }) {
   const feed = board.members
     .flatMap((m) => m.workouts.filter((w) => w.checked_in_at).map((w) => ({ w, m })))
     .sort((a, b) => +new Date(b.w.started_at) - +new Date(a.w.started_at));
@@ -20,11 +20,11 @@ export function AllWorkouts({ c, board, me, isAdmin }: { c: Challenge; board: Bo
       {days.map(({ day, items }) => (
         <section key={day}>
           <h2 className="mb-1.5 px-1 text-xs font-bold tracking-wider text-muted uppercase">{dayHeading(new Date(`${day}T12:00:00Z`))}</h2>
-          <ul className="card divide-y divide-line px-4">
+          <div className="space-y-3">
             {items.map(({ w, m }) => (
-              <WorkoutRow key={w.id} w={w} who={m} me={me} c={c} isAdmin={isAdmin} task={board.tasks.get(mondayOf(day))} />
+              <FeedCard key={w.id} w={w} who={m} me={me} c={c} task={board.tasks.get(mondayOf(day))} />
             ))}
-          </ul>
+          </div>
         </section>
       ))}
     </div>
