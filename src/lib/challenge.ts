@@ -21,29 +21,37 @@ export type Challenge = {
   joker_max: number;
 };
 
-export type Jokers = { enabled: boolean; earned: number; used: number; available: number; extra: number; toNext: number; every: number; max: number };
+export type Jokers = { enabled: boolean; held: number; earnedTotal: number; used: number; progress: number; every: number; max: number };
 
 /**
- * Jokers: workouts that count beyond the weekly requirement add up; every `joker_every` of them
- * earns one joker, at most `joker_max` per challenge. A joker clears one week's fine.
+ * Jokers are spare workouts. Every `joker_every` counted workouts beyond a week's requirement bank
+ * one joker; you can hold at most `joker_max` at a time (more is simply not banked). You apply them
+ * yourself to a finished week to fill missing workouts. Worked out in time order, so the cap holds.
  */
-export function jokersFor(c: Challenge, results: WeekResult[]): Jokers {
+export function jokersFor(c: Challenge, results: WeekResult[], uses: { count: number; created_at: Date }[], now = new Date()): Jokers {
   const every = c.joker_every ?? 0;
-  const extra = results
-    .filter((r) => r.state === "done" || r.state === "running")
-    .reduce((n, r) => n + Math.max(0, r.qualifying - c.min_sessions), 0);
-  const earned = every > 0 ? Math.min(Math.floor(extra / every), c.joker_max) : 0;
-  const used = results.filter((r) => r.fine === "joker").length;
-  return {
-    enabled: every > 0,
-    earned,
-    used,
-    available: Math.max(0, earned - used),
-    extra,
-    toNext: every > 0 && earned < c.joker_max ? extra % every : 0,
-    every,
-    max: c.joker_max,
-  };
+  if (!every) return { enabled: false, held: 0, earnedTotal: 0, used: 0, progress: 0, every: 0, max: c.joker_max };
+  const events: { t: number; extra?: number; use?: number }[] = [];
+  for (const r of results) {
+    if (r.state !== "done" && r.state !== "running") continue;
+    const extra = Math.max(0, r.qualifying - c.min_sessions);
+    // A finished week banks at its end; this week's extra counts already now.
+    const t = r.state === "done" ? fromOsloLocal(`${addDays(r.week, 7)}T00:00`).getTime() : now.getTime();
+    if (extra) events.push({ t, extra });
+  }
+  for (const u of uses) events.push({ t: new Date(u.created_at).getTime(), use: u.count });
+  events.sort((a, b) => a.t - b.t);
+  let held = 0, bank = 0, earnedTotal = 0, used = 0;
+  for (const e of events) {
+    if (e.use) { held = Math.max(0, held - e.use); used += e.use; continue; }
+    bank += e.extra!;
+    while (bank >= every) {
+      bank -= every;
+      if (held < c.joker_max) { held++; earnedTotal++; }
+    }
+    if (held >= c.joker_max) bank = 0; // full: extra workouts aren't saved
+  }
+  return { enabled: true, held, earnedTotal, used, progress: bank, every, max: c.joker_max };
 }
 
 /** Whether this person may sign up: everyone when the challenge is open, else only those the admin picked. */
@@ -97,6 +105,7 @@ export type WeekResult = {
   minutes: number;
   pending: number;
   fine: FineStatus | null; // only set for finished, failed weeks
+  jokersUsed: number; // spare workouts applied to this week
 };
 
 export const WORKOUT_COLUMNS = `id, user_id, started_at, duration_min, sport, title, distance_m, elevation_m, avg_hr,
@@ -125,7 +134,7 @@ export function ruleParts(c: Challenge): string[] {
   if (c.max_per_day) parts.push(c.max_per_day === 1 ? "maks 1 økt per dag" : `maks ${c.max_per_day} økter per dag`);
   parts.push(c.check_in_hours ? `sjekk inn innen ${c.check_in_hours} t` : "sjekk inn før uka er over");
   if (c.proof_required) parts.push("bilde påkrevd");
-  if (c.joker_every) parts.push(`${c.joker_every} ekstra økter = 🃏 joker (maks ${c.joker_max})`);
+  if (c.joker_every) parts.push(`${c.joker_every === 1 ? "ekstra økt" : `${c.joker_every} ekstra økter`} = 🃏 joker (maks ${c.joker_max} på lur)`);
   parts.push(`bot ${c.penalty_kr} kr`);
   return parts;
 }
@@ -211,6 +220,7 @@ export function evaluateWeek(c: Challenge, week: string, workouts: Workout[], ta
     passed: volumeMet && taskMet,
     minutes: checkedIn.reduce((sum, w) => sum + w.duration_min, 0),
     pending: workouts.filter((w) => w.status === "pending").length,
+    jokersUsed: 0,
   };
 }
 
@@ -232,7 +242,7 @@ export type Board = {
 export async function loadBoard(c: Challenge): Promise<Board> {
   const today = osloDate();
   const weeks = weeksBetween(c.starts_on, c.ends_on);
-  const [members, workouts, tasks, fines] = await Promise.all([
+  const [members, workouts, tasks, fines, jokerUses] = await Promise.all([
     query<Member>(
       `select u.id, u.name, u.color, u.strava_athlete_id::text, u.is_admin, m.joined_at,
               extract(epoch from u.avatar_updated_at)::int as avatar_v
@@ -253,6 +263,10 @@ export async function loadBoard(c: Challenge): Promise<Board> {
       "select user_id, week_start, status from fines where challenge_id = $1",
       [c.id],
     ),
+    query<{ user_id: number; week_start: string; count: number; created_at: Date }>(
+      "select user_id, week_start, count, created_at from joker_uses where challenge_id = $1",
+      [c.id],
+    ),
   ]);
   const taskMap = new Map(tasks.map((t) => [t.week_start, t]));
   const fineMap = new Map(fines.map((f) => [`${f.user_id}:${f.week_start}`, f.status]));
@@ -269,11 +283,18 @@ export async function loadBoard(c: Challenge): Promise<Board> {
         const inWeek = mine.filter((w) => mondayOf(osloDate(w.started_at)) === week);
         const r = evaluateWeek(c, week, inWeek, taskMap.get(week), today);
         if (week < first) return { ...r, state: "before" as const, passed: false, fine: null };
+        // Jokers applied to this week fill missing workouts.
+        const jokersUsed = jokerUses.find((u) => u.user_id === m.id && u.week_start === week)?.count ?? 0;
+        if (jokersUsed) {
+          r.jokersUsed = jokersUsed;
+          r.volumeMet = r.qualifying + jokersUsed >= c.min_sessions;
+          r.passed = r.volumeMet && r.taskMet;
+        }
         const fine = r.state === "done" && !r.passed ? (fineMap.get(`${m.id}:${week}`) ?? "owed") : null;
         return { ...r, fine };
       });
       const sum = (status: FineStatus) => results.filter((r) => r.fine === status).length * c.penalty_kr;
-      return { ...m, results, workouts: mine, owedKr: sum("owed"), claimedKr: sum("claimed"), paidKr: sum("paid"), jokers: jokersFor(c, results) };
+      return { ...m, results, workouts: mine, owedKr: sum("owed"), claimedKr: sum("claimed"), paidKr: sum("paid"), jokers: jokersFor(c, results, jokerUses.filter((u) => u.user_id === m.id)) };
     }),
   };
 }

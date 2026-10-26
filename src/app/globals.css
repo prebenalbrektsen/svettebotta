@@ -144,6 +144,8 @@ html[data-typing] .chat-input { bottom: calc(10px + env(safe-area-inset-bottom))
   transition: transform 0.08s ease;
 }
 .btn:active { transform: scale(0.98); }
+.btn:focus { outline: none; }
+.btn:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 .btn-heat { background: var(--color-heat); color: white; }
 .btn-ghost { background: transparent; color: var(--color-ink); border: 1px solid var(--color-line); }
 .btn-sm { min-height: 34px; padding: 0 0.75rem; font-size: 0.875rem; border-radius: 8px; }

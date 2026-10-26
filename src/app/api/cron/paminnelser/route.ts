@@ -1,4 +1,4 @@
-import { activeChallenge, checkInDeadline, evaluateWeek, firstCountedWeek, WORKOUT_COLUMNS, type WeeklyTask, type Workout } from "@/lib/challenge";
+import { activeChallenge, checkInDeadline, loadBoard, evaluateWeek, firstCountedWeek, WORKOUT_COLUMNS, type WeeklyTask, type Workout } from "@/lib/challenge";
 import { query } from "@/lib/db";
 import { once, push } from "@/lib/push";
 import { sportLabel } from "@/lib/sports";
@@ -46,15 +46,18 @@ export async function GET(request: Request) {
 
   // 2) Sunday from 17:00: whoever hasn't got the week in the bag yet.
   if (osloWeekday() === "Sun" && osloHour() >= 17) {
+    const board = await loadBoard(c); // for each person's jokers
     for (const m of members) {
       if (firstCountedWeek(c, m.joined_at) > week) continue;
       const mine = workouts.filter((w) => w.user_id === m.user_id && mondayOf(osloDate(new Date(w.started_at))) === week);
       const r = evaluateWeek(c, week, mine, task, today);
       if (r.passed || !(await once(`sunday:${c.id}:${week}:${m.user_id}`))) continue;
       const missing = Math.max(0, c.min_sessions - r.qualifying);
+      const held = board.members.find((x) => x.id === m.user_id)?.jokers.held ?? 0;
+      const jokerNote = r.taskMet && missing <= held ? ` Jokeren${missing > 1 ? "e" : ""} din${missing > 1 ? "e" : ""} kan redde uka – men en økt til sparer ${missing > 1 ? "dem" : "den"}!` : ` Ellers blir det ${c.penalty_kr} kr i bøtta.`;
       await push([m.user_id], "reminders", {
         title: "Uka glipper snart! ⏳",
-        body: r.volumeMet ? `Du mangler ukeskravet «${task?.title}». Fristen er i kveld kl. 24.` : `Du mangler ${missing} økt${missing === 1 ? "" : "er"} – fristen er i kveld kl. 24. Ellers blir det ${c.penalty_kr} kr i bøtta.`,
+        body: r.volumeMet ? `Du mangler ukeskravet «${task?.title}». Fristen er i kveld kl. 24.` : `Du mangler ${missing} økt${missing === 1 ? "" : "er"} – fristen er i kveld kl. 24.${jokerNote}`,
         url: "/",
         tag: "sunday",
       });

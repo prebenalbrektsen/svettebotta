@@ -19,7 +19,7 @@ export function WeekProgress({ c, r, small }: { c: Challenge; r: WeekResult; sma
 export function statusLabel(c: Challenge, r: WeekResult): { text: string; tone: "ok" | "warn" | "bad" | "muted" } {
   if (r.state === "future") return { text: "Ikke startet", tone: "muted" };
   if (r.state === "before") return { text: "Ikke med", tone: "muted" };
-  if (r.passed) return { text: "I boks", tone: "ok" };
+  if (r.passed) return { text: r.jokersUsed ? "I boks med 🃏" : "I boks", tone: "ok" };
   if (r.state === "done") {
     if (r.fine === "paid") return { text: "Betalt", tone: "muted" };
     if (r.fine === "waived") return { text: "Fritatt", tone: "muted" };

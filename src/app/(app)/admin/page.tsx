@@ -62,14 +62,14 @@ function ChallengeFields({ c }: { c?: Challenge }) {
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
           <span className="label">🃏 Ekstra økter per joker – tomt = ingen jokere</span>
-          <input type="number" min={1} name="joker_every" className="field" defaultValue={c ? (c.joker_every ?? "") : 4} />
+          <input type="number" min={1} name="joker_every" className="field" defaultValue={c ? (c.joker_every ?? "") : 1} />
         </label>
         <label className="block">
-          <span className="label">Maks jokere per utfordring</span>
+          <span className="label">Maks jokere på lur samtidig</span>
           <input type="number" min={0} name="joker_max" className="field" defaultValue={c?.joker_max ?? 2} />
         </label>
       </div>
-      <p className="-mt-1 text-xs text-muted">Økter utover ukeskravet samles opp. En joker kan brukes i stedet for å betale én ukes bot.</p>
+      <p className="-mt-1 text-xs text-muted">Økter utover ukeskravet blir jokere. En joker fyller én økt man manglet i en ferdig uke – deltakeren bruker den selv fra bøtefeltet.</p>
       <fieldset className="space-y-2">
         <legend className="label">Hvem kan bli med?</legend>
         <label className="flex items-center gap-2 text-sm"><input type="radio" name="join_mode" value="open" defaultChecked={(c?.join_mode ?? "open") === "open"} className="h-5 w-5 accent-[#ff4d1c]" /> Alle i appen kan melde seg på</label>

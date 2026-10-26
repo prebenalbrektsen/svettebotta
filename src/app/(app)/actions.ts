@@ -511,20 +511,23 @@ export async function removeInvite(userId: number): Promise<void> {
 
 // ---- Jokers ----
 
-/** Spend a joker on one of your own unpaid weeks: the fine disappears. */
-export async function spendJoker(week: string): Promise<void> {
+/**
+ * Fill a finished, failed week with jokers (spare workouts). Only when the jokers cover every
+ * missing workout and the weekly task was done – otherwise they'd be spent for nothing.
+ */
+export async function applyJokers(week: string): Promise<void> {
   const user = await requireUser();
   const c = await activeChallenge();
   if (!c?.joker_every) return;
   const board = await loadBoard(c);
   const me = board.members.find((m) => m.id === user.id);
   const r = me?.results.find((x) => x.week === week);
-  if (!me || !r || r.fine !== "owed" || me.jokers.available < 1) return;
-  await query(
-    `insert into fines (challenge_id, user_id, week_start, status) values ($1, $2, $3, 'joker')
-     on conflict (challenge_id, user_id, week_start) do update set status = 'joker', updated_at = now()`,
-    [c.id, user.id, week],
-  );
-  await query("insert into messages (user_id, body) values (null, $1)", [`🃏 ${user.name} brukte en joker for uke ${isoWeekNumber(week)}.`]);
+  if (!me || !r || r.state !== "done" || r.passed || !r.taskMet || r.fine !== "owed") return;
+  const missing = c.min_sessions - r.qualifying;
+  if (missing < 1 || missing > me.jokers.held) return;
+  await query("insert into joker_uses (challenge_id, user_id, week_start, count) values ($1, $2, $3, $4) on conflict do nothing", [c.id, user.id, week, missing]);
+  await query("insert into messages (user_id, body) values (null, $1)", [
+    `🃏 ${user.name} brukte ${missing === 1 ? "en joker" : `${missing} jokere`} – uke ${isoWeekNumber(week)} er i boks!`,
+  ]);
   revalidatePath("/", "layout");
 }

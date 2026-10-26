@@ -1,3 +1,4 @@
+import { CelebrationsFor } from "@/components/CelebrationsFor";
 import { ConnectWithStrava, PoweredByStrava } from "@/components/StravaBrand";
 import { LogForm } from "@/components/LogForm";
 import { SyncButton } from "@/components/SyncButton";
@@ -54,8 +55,10 @@ export default async function LogPage({ searchParams }: { searchParams: Promise<
     const result = { ...evaluateWeek(c, week, recent, task ?? undefined), fine: null };
     // Waiting for check-in first: that is the thing to do on this screen.
     recent.sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending"));
+    const celebrationBoard = await loadBoard(c);
     return (
       <div className="space-y-4 pt-2">
+        <CelebrationsFor c={c} board={celebrationBoard} userId={user.id} />
         <h1 className="display text-5xl">Økter</h1>
         <WorkoutsSwitch all={false} mineLabel={mineLabel} />
         <section className="card p-4">

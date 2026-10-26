@@ -1,4 +1,6 @@
-import { spendJoker } from "./actions";
+import { CelebrationsFor } from "@/components/CelebrationsFor";
+import { applyJokers } from "./actions";
+import { JokerInfo } from "@/components/Celebrate";
 import { Count } from "@/components/Count";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import Link from "next/link";
@@ -60,6 +62,11 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   // The admin can paste the bøtekasse's Vipps link; then paying is one tap that opens the Vipps app.
   const vippsLink = /^https:\/\/\S+$/.test(c.vipps_info?.trim() ?? "") ? c.vipps_info!.trim() : null;
   const owedWeeks = me?.results.filter((r) => r.fine === "owed").map((r) => r.week) ?? [];
+  // Owed weeks that the person's jokers could fully cover (and where the weekly task was done).
+  const jokerWeeks = (me?.results ?? [])
+    .filter((r) => r.fine === "owed" && r.taskMet)
+    .map((r) => ({ week: r.week, missing: c.min_sessions - r.qualifying }))
+    .filter((x) => x.missing > 0 && x.missing <= (me?.jokers.held ?? 0));
   const started = today >= c.starts_on;
   const over = today > c.ends_on;
 
@@ -97,6 +104,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="stagger space-y-4 pt-2">
+      <CelebrationsFor c={c} board={board} userId={user.id} />
       {logget && <p className="rounded-xl bg-ok-soft px-4 py-3 font-semibold text-ok">Økta er registrert. Sterkt! 💪</p>}
 
       {pendingUsers > 0 && (
@@ -141,10 +149,11 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
           </div>
           {myWeek.hasLong && <p className="mt-2 text-xs text-muted">Langøkt teller ×{c.long_session_counts}.</p>}
           {me.jokers.enabled && (
-            <p className="mt-1 text-xs font-semibold text-muted">
-              🃏 {me.jokers.available} {me.jokers.available === 1 ? "joker" : "jokere"}
-              {me.jokers.earned < me.jokers.max ? ` · ${me.jokers.toNext}/${me.jokers.every} ekstra økter mot neste` : " · maks opptjent"}
-            </p>
+            <JokerInfo held={me.jokers.held} max={me.jokers.max} every={me.jokers.every}>
+              <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-muted underline decoration-dotted underline-offset-2">
+                🃏 {me.jokers.held} av maks {me.jokers.max} jokere på lur
+              </span>
+            </JokerInfo>
           )}
           {task && <p className="mt-1 text-xs text-muted">Ukeskrav «{task.title}»: {myWeek.taskMet ? "✓ oppfylt" : "ikke ennå"}</p>}
           {myPending > 0 ? (
@@ -173,12 +182,14 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
             {vippsLink ? " Betal i Vipps, og trykk så «Jeg har betalt»." : c.vipps_info ? ` Vipps til ${c.vipps_info}.` : " Vipps til bøtekassa."}
           </p>
           <div className="mt-3 flex flex-col gap-2">
-            {me && me.jokers.available > 0 && (
+            {jokerWeeks.length > 0 && (
               <div className="rounded-xl bg-white/15 p-3">
-                <p className="text-sm font-semibold">Du har {me.jokers.available} {me.jokers.available === 1 ? "joker" : "jokere"} 🃏 – bruk en i stedet for å betale:</p>
+                <p className="text-sm font-semibold">Du har {me!.jokers.held} {me!.jokers.held === 1 ? "joker" : "jokere"} 🃏 – de kan fylle økter du manglet:</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {owedWeeks.slice(0, me.jokers.available).map((w) => (
-                    <form key={w} action={spendJoker.bind(null, w)}><button className="btn btn-sm bg-paper text-ink">Bruk joker for uke {isoWeekNumber(w)}</button></form>
+                  {jokerWeeks.map(({ week: w, missing }) => (
+                    <form key={w} action={applyJokers.bind(null, w)}>
+                      <button className="btn btn-sm bg-paper text-ink">Bruk {missing === 1 ? "1 joker" : `${missing} jokere`} – uke {isoWeekNumber(w)} i boks</button>
+                    </form>
                   ))}
                 </div>
               </div>

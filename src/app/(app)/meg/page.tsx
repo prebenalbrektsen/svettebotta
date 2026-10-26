@@ -1,3 +1,4 @@
+import { CelebrationsFor } from "@/components/CelebrationsFor";
 import { PushSettings } from "@/components/PushSettings";
 import { CATEGORIES } from "@/lib/push";
 import { Badges, badgesFor, Records, WeeklyChart } from "@/components/Profile";
@@ -48,6 +49,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="space-y-5 pt-2">
+      {c && board && <CelebrationsFor c={c} board={board} userId={user.id} />}
       <div className="flex items-end justify-between gap-3">
         <div className="flex items-center gap-4">
           <AvatarUpload p={{ id: user.id, name: user.name, color: user.color, avatar_v: avatarV }} />
