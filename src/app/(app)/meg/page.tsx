@@ -2,7 +2,7 @@ import { logout } from "@/app/auth-actions";
 import { stravaDisconnect } from "../actions";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { StatTiles } from "@/components/StatTiles";
-import { one } from "@/lib/db";
+import { one, query } from "@/lib/db";
 import { SyncButton } from "@/components/SyncButton";
 import { Pill, statusLabel, WeekProgress } from "@/components/WeekProgress";
 import { WorkoutRow } from "@/components/WorkoutRow";
@@ -14,7 +14,8 @@ import { ago, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/t
 import { Icon } from "@/components/Icon";
 import { ActionForm } from "@/components/ActionForm";
 import { WatchGuide } from "@/components/WatchGuide";
-import { changePassword, renameMe } from "../actions";
+import { changePassword, deletePasskey, renameMe } from "../actions";
+import { AddPasskey } from "@/components/Passkeys";
 
 const STRAVA_MSG: Record<string, [string, string]> = {
   ok: ["Strava er koblet til og øktene dine er hentet. 🎉", "text-ok bg-ok-soft"],
@@ -26,6 +27,8 @@ const STRAVA_MSG: Record<string, [string, string]> = {
 export default async function MePage({ searchParams }: { searchParams: Promise<{ strava?: string }> }) {
   const user = await requireUser();
   const { strava } = await searchParams;
+  const passkeys = await query<{ id: number; name: string; last_used_at: Date | null; created_at: Date }>(
+    "select id, name, last_used_at, created_at from passkeys where user_id = $1 order by created_at", [user.id]);
   const avatarV = (await one<{ v: number | null }>("select extract(epoch from avatar_updated_at)::int as v from users where id = $1", [user.id]))!.v;
   const c = await activeChallenge();
   const board = c ? await loadBoard(c) : null;
@@ -122,6 +125,22 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </ul>
         </section>
       )}
+
+      <section className="card space-y-3 p-4">
+        <h2 className="font-bold">Logg inn med Face ID</h2>
+        <p className="text-sm text-muted">Slå det på én gang per telefon eller PC – så logger du inn med ansiktet eller fingeren i stedet for passord.</p>
+        {passkeys.length > 0 && (
+          <ul className="divide-y divide-line">
+            {passkeys.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                <span><strong>{p.name}</strong><span className="text-muted"> · {p.last_used_at ? `brukt ${ago(new Date(p.last_used_at))}` : `lagt til ${ago(new Date(p.created_at))}`}</span></span>
+                <form action={deletePasskey.bind(null, p.id)}><button className="text-xs text-muted underline">Fjern</button></form>
+              </li>
+            ))}
+          </ul>
+        )}
+        <AddPasskey label={passkeys.length ? "Legg til denne enheten også" : "Slå på Face ID / Touch ID på denne enheten"} />
+      </section>
 
       <section className="card space-y-5 p-4">
         <h2 className="font-bold">Innstillinger</h2>

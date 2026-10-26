@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { Avatar } from "@/components/Avatar";
 import { JoinCard } from "@/components/JoinCard";
 import { RoleTag } from "@/components/RoleTag";
-import { activeChallenge, loadBoard, ruleParts, type Challenge } from "@/lib/challenge";
+import { activeChallenge, loadBoard, mayJoin, ruleParts, type Challenge } from "@/lib/challenge";
 import { query } from "@/lib/db";
 import { sportLabel } from "@/lib/sports";
 import { addDays, formatDay, formatWeekRange, fromOsloLocal, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
@@ -34,10 +34,14 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   }
   const board = await loadBoard(c);
   // Challenges coming up that this person has not signed up for (or has, and may back out of).
+  // Only the ones this person may join: open ones, or ones the admin picked them for.
   const upcoming = await query<Challenge & { joined: boolean; count: number }>(
     `select c.*, exists(select 1 from challenge_members m where m.challenge_id = c.id and m.user_id = $2) as joined,
             (select count(*)::int from challenge_members m where m.challenge_id = c.id) as count
-       from challenges c where c.starts_on > $1::date and c.id <> $3 order by c.starts_on`,
+       from challenges c where c.starts_on > $1::date and c.id <> $3
+        and (c.join_mode = 'open' or exists(select 1 from challenge_invites i where i.challenge_id = c.id and i.user_id = $2)
+             or exists(select 1 from challenge_members m where m.challenge_id = c.id and m.user_id = $2))
+      order by c.starts_on`,
     [osloDate(), user.id, c.id],
   );
   const today = osloDate();
@@ -46,6 +50,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   const task = board.tasks.get(week);
   const me = board.members.find((m) => m.id === user.id);
   const myWeek = me?.results[weekIndex];
+  const allowed = !me && (await mayJoin(c, user.id));
   const owedWeeks = me?.results.filter((r) => r.fine === "owed").map((r) => r.week) ?? [];
   const started = today >= c.starts_on;
   const over = today > c.ends_on;
@@ -79,7 +84,9 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
         </ul>
       </section>
 
-      {!me && <JoinCard c={c} joined={false} count={board.members.length} />}
+      {!me && (allowed
+        ? <JoinCard c={c} joined={false} count={board.members.length} />
+        : <p className="card p-4 text-sm text-muted">Du er ikke med i {c.name}. Vil du være med, si fra til kontrolløren.</p>)}
 
       {myPending > 0 && (
         <Link href="/logg" className="block rounded-2xl bg-warn-soft p-4 text-warn">

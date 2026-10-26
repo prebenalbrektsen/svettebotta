@@ -16,7 +16,14 @@ export type Challenge = {
   max_per_day: number | null;
   proof_required: boolean;
   description: string | null;
+  join_mode: "open" | "selected";
 };
+
+/** Whether this person may sign up: everyone when the challenge is open, else only those the admin picked. */
+export async function mayJoin(c: Challenge, userId: number): Promise<boolean> {
+  if (c.join_mode === "open") return true;
+  return !!(await one("select 1 from challenge_invites where challenge_id = $1 and user_id = $2", [c.id, userId]));
+}
 
 export type Workout = {
   id: number;

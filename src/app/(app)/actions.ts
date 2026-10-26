@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { announceWeek } from "@/lib/announce";
 import { processAvatar, processProof } from "@/lib/images";
 import { checkPassword, hashPassword, newToken, requireAdmin, requireUser } from "@/lib/auth";
-import { activeChallenge, checkInDeadline, loadBoard, type Challenge } from "@/lib/challenge";
+import { activeChallenge, checkInDeadline, loadBoard, mayJoin, type Challenge } from "@/lib/challenge";
 import { one, query } from "@/lib/db";
 import { disconnectStrava, syncStrava } from "@/lib/strava";
 import { sportLabel, WATER_SPORTS } from "@/lib/sports";
@@ -198,6 +198,7 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
     form.get("proof_required") === "on",
     String(form.get("description") ?? "").trim() || null,
     Math.max(1, int(form, "long_session_counts") ?? 2),
+    form.get("join_mode") === "selected" ? "selected" : "open",
   ];
   if (!values[0] || !values[1] || !values[2] || values[3] == null || !values[4] || !values[5]) return { error: "Fyll inn alle feltene." };
   if (values[2]! < values[1]!) return { error: "Sluttdato må være etter startdato." };
@@ -205,19 +206,21 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
     await query(
       `update challenges set name = $2, starts_on = $3, ends_on = $4, penalty_kr = $5, min_sessions = $6,
          session_minutes = $7, long_session_minutes = $8, vipps_info = $9, check_in_hours = $10, max_per_day = $11,
-         proof_required = $12, description = $13, long_session_counts = $14 where id = $1`,
+         proof_required = $12, description = $13, long_session_counts = $14, join_mode = $15 where id = $1`,
       [id, ...values],
     );
   } else {
     const c = await one<Challenge>(
       `insert into challenges (name, starts_on, ends_on, penalty_kr, min_sessions, session_minutes, long_session_minutes, vipps_info,
-         check_in_hours, max_per_day, proof_required, description, long_session_counts)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning *`,
+         check_in_hours, max_per_day, proof_required, description, long_session_counts, join_mode)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning *`,
       values,
     );
     // Nobody is signed up automatically: everyone gets a «Bli med» card and opts in.
     await query("insert into messages (user_id, body, event_key) values (null, $1, $2)", [
-      `📣 Ny utfordring: ${c!.name} starter ${formatDay(c!.starts_on)}. Se reglene og bli med på forsiden!`,
+      c!.join_mode === "open"
+        ? `📣 Ny utfordring: ${c!.name} starter ${formatDay(c!.starts_on)}. Se reglene og bli med på forsiden!`
+        : `📣 Ny utfordring: ${c!.name} starter ${formatDay(c!.starts_on)}. Er du invitert, ser du «Bli med» på forsiden.`,
       `challenge:${c!.id}`,
     ]);
   }
@@ -229,7 +232,7 @@ export async function saveChallenge(_: ActionState, form: FormData): Promise<Act
 export async function joinChallenge(challengeId: number): Promise<void> {
   const user = await requireUser();
   const c = await one<Challenge>("select * from challenges where id = $1 and ends_on >= $2::date", [challengeId, osloDate()]);
-  if (!c) return;
+  if (!c || !(await mayJoin(c, user.id))) return;
   const added = await query("insert into challenge_members (challenge_id, user_id) values ($1, $2) on conflict do nothing returning 1", [c.id, user.id]);
   if (added.length) {
     await query("insert into messages (user_id, body, event_key) values (null, $1, $2) on conflict (event_key) do nothing", [
@@ -407,4 +410,18 @@ export async function changePassword(_: ActionState, form: FormData): Promise<Ac
   await query("update users set password_hash = $2 where id = $1", [user.id, await hashPassword(next)]);
   // Other phones stay logged in with their own session; this one too.
   return { ok: "Passordet er byttet." };
+}
+
+export async function deletePasskey(id: number): Promise<void> {
+  const user = await requireUser();
+  await query("delete from passkeys where id = $1 and user_id = $2", [id, user.id]);
+  revalidatePath("/meg");
+}
+
+/** Admin, for challenges where only picked people may join: allow or disallow one person. */
+export async function toggleInvite(challengeId: number, userId: number): Promise<void> {
+  await requireAdmin();
+  const removed = await query("delete from challenge_invites where challenge_id = $1 and user_id = $2 returning 1", [challengeId, userId]);
+  if (!removed.length) await query("insert into challenge_invites (challenge_id, user_id) values ($1, $2)", [challengeId, userId]);
+  revalidatePath("/", "layout");
 }

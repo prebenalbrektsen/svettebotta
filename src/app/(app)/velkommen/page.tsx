@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { JoinCard } from "@/components/JoinCard";
 import { WatchGuide } from "@/components/WatchGuide";
+import { AddPasskey } from "@/components/Passkeys";
 import { requireUser } from "@/lib/auth";
-import { activeChallenge } from "@/lib/challenge";
+import { activeChallenge, mayJoin } from "@/lib/challenge";
 import { one } from "@/lib/db";
 import { stravaConfigured } from "@/lib/strava";
 
@@ -25,7 +26,9 @@ export default async function WelcomePage() {
 
       <section className="card space-y-3 p-4">
         <div className="flex items-center gap-3"><span className={step}>1</span><h2 className="font-bold">Bli med i utfordringen</h2></div>
-        {c && membership ? <JoinCard c={c} joined={membership.joined} count={membership.count} /> : <p className="text-sm text-muted">Ingen utfordring er startet ennå – du får beskjed i Prat.</p>}
+        {c && membership && (membership.joined || (await mayJoin(c, user.id)))
+          ? <JoinCard c={c} joined={membership.joined} count={membership.count} />
+          : <p className="text-sm text-muted">{c ? "Kontrolløren velger hvem som er med – du får beskjed i Prat når du kan bli med." : "Ingen utfordring er startet ennå – du får beskjed i Prat."}</p>}
       </section>
 
       {stravaConfigured() && (
@@ -43,6 +46,12 @@ export default async function WelcomePage() {
           <li><strong>iPhone (Safari):</strong> trykk Del-knappen (firkant med pil opp) → «Legg til på Hjem-skjerm».</li>
           <li><strong>Android (Chrome):</strong> trykk ⋮ øverst til høyre → «Legg til på startskjermen».</li>
         </ul>
+      </section>
+
+      <section className="card space-y-3 p-4">
+        <div className="flex items-center gap-3"><span className={step}>{stravaConfigured() ? 4 : 3}</span><h2 className="font-bold">Logg inn med Face ID</h2></div>
+        <p className="text-sm text-muted">Slipp passordet neste gang – logg inn med ansiktet eller fingeren.</p>
+        <AddPasskey />
       </section>
 
       <Link href="/" className="btn w-full">Ferdig – til forsiden</Link>

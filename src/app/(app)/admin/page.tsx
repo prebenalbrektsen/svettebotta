@@ -7,7 +7,7 @@ import { activeChallenge, loadBoard, type Challenge } from "@/lib/challenge";
 import { query } from "@/lib/db";
 import { stravaConfigured } from "@/lib/strava";
 import { addDays, formatWeekRange, isoWeekNumber, mondayOf, osloDate } from "@/lib/time";
-import { confirmAllClaimed, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleMember } from "../actions";
+import { confirmAllClaimed, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
 
 const TABS = [
   { id: "boter", label: "Bøter" },
@@ -57,6 +57,11 @@ function ChallengeFields({ c }: { c?: Challenge }) {
         <input type="checkbox" name="proof_required" className="h-5 w-5 accent-[#ff4d1c]" defaultChecked={c ? c.proof_required : true} />
         Bilde påkrevd for å sjekke inn (også for Strava-økter)
       </label>
+      <fieldset className="space-y-2">
+        <legend className="label">Hvem kan bli med?</legend>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="join_mode" value="open" defaultChecked={(c?.join_mode ?? "open") === "open"} className="h-5 w-5 accent-[#ff4d1c]" /> Alle i appen kan melde seg på</label>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="join_mode" value="selected" defaultChecked={c?.join_mode === "selected"} className="h-5 w-5 accent-[#ff4d1c]" /> Bare de jeg velger (under Deltakere)</label>
+      </fieldset>
       <label className="block">
         <span className="label">Beskrivelse – vises på «Bli med»-kortet (valgfritt)</span>
         <textarea name="description" rows={3} className="field" defaultValue={c?.description ?? ""} placeholder="Åtte uker før jul. Den som har flest uker i boks slipper å vaske opp på julaften." />
@@ -77,6 +82,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     "select id, name, email, invite_token, is_admin, strava_athlete_id is not null as strava from users order by name",
   );
   const memberIds = new Set(board?.members.map((m) => m.id));
+  const invited = new Set(
+    c ? (await query<{ user_id: number }>("select user_id from challenge_invites where challenge_id = $1", [c.id])).map((r) => r.user_id) : [],
+  );
   const appUrl = process.env.APP_URL ?? "";
 
   // Unsettled fines, grouped per person: one row per person with a total, not one per week.
@@ -226,7 +234,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         <p className="text-xs text-muted">
                           {u.invite_token && !u.email ? "Har ikke åpnet invitasjonen ennå" : u.email}
                           {u.strava && " · Strava ✓"}
-                          {c && (memberIds.has(u.id) ? ` · med i ${c.name}` : " · ikke påmeldt")}
+                          {c && (memberIds.has(u.id) ? ` · med i ${c.name}` : c.join_mode === "selected" && !invited.has(u.id) ? " · har ikke tilgang til utfordringen" : " · ikke påmeldt ennå")}
                         </p>
                       </div>
                       {!u.is_admin && (
@@ -239,6 +247,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         </details>
                       )}
                     </div>
+                    {c?.join_mode === "selected" && !memberIds.has(u.id) && (
+                      <form action={toggleInvite.bind(null, c.id, u.id)} className="mt-2">
+                        <button className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold ${invited.has(u.id) ? "border-ok bg-ok-soft text-ok" : "border-line"}`}>
+                          {invited.has(u.id) ? `✓ Kan bli med i ${c.name}` : `Gi tilgang til ${c.name}`}
+                        </button>
+                      </form>
+                    )}
                     {u.invite_token && <div className="mt-2"><CopyLink url={`${appUrl}/invitasjon/${u.invite_token}`} /></div>}
                   </li>
                 ))}

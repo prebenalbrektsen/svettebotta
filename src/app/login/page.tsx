@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
+import { PasskeyLogin } from "@/components/Passkeys";
 import { Logo } from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
 import { hasUsers, login, setupAdmin } from "../auth-actions";
@@ -27,6 +28,9 @@ export default async function LoginPage() {
             />
           </>
         ) : (
+          <>
+          <PasskeyLogin />
+          <p className="my-4 flex items-center gap-3 text-xs font-semibold text-muted uppercase"><span className="h-px flex-1 bg-line" />eller med passord<span className="h-px flex-1 bg-line" /></p>
           <AuthForm
             action={login}
             submit="Logg inn"
@@ -35,6 +39,7 @@ export default async function LoginPage() {
               { name: "password", label: "Passord", type: "password", autoComplete: "current-password" },
             ]}
           />
+          </>
         )}
         {!firstRun && <p className="mt-4 text-center text-sm text-muted">Glemt passordet? Be kontrolløren om en ny innloggingslenke.</p>}
       </div>
