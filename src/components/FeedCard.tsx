@@ -26,7 +26,8 @@ export function FeedCard({ w, who, c, me, task }: { w: Workout; who: Who; c: Cha
   const credit = workoutCredit(c, w);
 
   return (
-    <article className="card overflow-hidden">
+    // Mobile: edge to edge, like a photo feed (cancels the page's side padding). Wider screens: a card.
+    <article className="-mx-4 overflow-hidden border-y border-line bg-card sm:mx-0 sm:rounded-[14px] sm:border">
       <header className="flex items-center gap-3 px-4 pt-3.5 pb-3">
         <Link href={`/person/${who.id}`}><Avatar p={who} size={38} /></Link>
         <div className="min-w-0 flex-1">
@@ -48,7 +49,7 @@ export function FeedCard({ w, who, c, me, task }: { w: Workout; who: Who; c: Cha
       {w.has_proof ? (
         <Link href={`/okt/${w.id}`} className="block bg-line/40">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/bilde/${w.id}`} alt={`Bilde fra ${who.name.split(" ")[0]} sin økt`} loading="lazy" className="aspect-[4/5] max-h-[520px] w-full object-cover" />
+          <img src={`/api/bilde/${w.id}`} alt={`Bilde fra ${who.name.split(" ")[0]} sin økt`} loading="lazy" className="aspect-[4/5] w-full object-cover sm:max-h-[560px]" />
         </Link>
       ) : null}
 
