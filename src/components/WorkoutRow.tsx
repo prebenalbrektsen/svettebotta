@@ -3,7 +3,9 @@ import type { Challenge, WeeklyTask, Workout } from "@/lib/challenge";
 import { checkInDeadline, meetsTask, workoutCredit } from "@/lib/challenge";
 import { sportIcon, sportLabel } from "@/lib/sports";
 import { formatMinutes, relativeTime } from "@/lib/time";
-import { approveWorkout, deleteWorkout, toggleKudos, toggleMeetsTask, toggleRejected } from "@/app/(app)/actions";
+import { approveWorkout, deleteWorkout, toggleMeetsTask, toggleRejected } from "@/app/(app)/actions";
+import { ActionMenu } from "./ActionMenu";
+import { KudosButton } from "./KudosButton";
 import { CheckIn } from "./CheckIn";
 import { Icon } from "./Icon";
 
@@ -82,15 +84,7 @@ export function WorkoutRow({
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
           {me !== undefined && w.checked_in_at && (
             <>
-              <form action={toggleKudos.bind(null, w.id)}>
-                <button
-                  className={`inline-flex h-8 items-center gap-1 rounded-full px-2.5 font-semibold ${w.kudos_by.includes(me) ? "bg-heat text-white" : "bg-line/60 text-muted"}`}
-                  disabled={mine}
-                  aria-label={mine ? `${w.kudos_by.length} kudos` : w.kudos_by.includes(me) ? "Ta tilbake kudos" : "Gi kudos"}
-                >
-                  <Icon name="flame" className="h-4 w-4" />{w.kudos_by.length || ""}
-                </button>
-              </form>
+              <KudosButton workoutId={w.id} given={w.kudos_by.includes(me)} count={w.kudos_by.length} own={mine} />
               <Link href={`/okt/${w.id}`} className="inline-flex h-8 items-center gap-1 rounded-full bg-line/60 px-2.5 font-semibold text-muted" aria-label="Kommentarer">
                 <Icon name="comment" className="h-4 w-4" />{w.comment_count || ""}
               </Link>
@@ -104,24 +98,13 @@ export function WorkoutRow({
             </form>
           )}
           {menu && (
-            <details data-menu className="relative">
-              <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full bg-line/60 text-muted" aria-label="Flere valg">
-                <Icon name="more" className="h-4 w-4" />
-              </summary>
-              <div className="absolute left-0 z-10 mt-1 flex w-56 flex-col rounded-xl border border-line bg-card p-1 shadow-lg">
-                {canEdit && w.source === "manual" && (
-                  <form action={deleteWorkout.bind(null, w.id)}><button className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-line/50">Slett økta</button></form>
-                )}
-                {isAdmin && waiting && (
-                  <form action={approveWorkout.bind(null, w.id)}><button className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-line/50">Godkjenn uten innsjekk</button></form>
-                )}
-                {isAdmin && (
-                  <form action={toggleRejected.bind(null, w.id)}>
-                    <button className="w-full rounded-lg px-3 py-2 text-left text-sm text-bad hover:bg-line/50">{w.rejected ? "Godkjenn likevel" : "Underkjenn økta"}</button>
-                  </form>
-                )}
-              </div>
-            </details>
+            <ActionMenu
+              items={[
+                ...(canEdit && w.source === "manual" ? [{ label: "Slett økta", action: deleteWorkout.bind(null, w.id), danger: true }] : []),
+                ...(isAdmin && waiting ? [{ label: "Godkjenn uten innsjekk", action: approveWorkout.bind(null, w.id) }] : []),
+                ...(isAdmin ? [{ label: w.rejected ? "Godkjenn likevel" : "Underkjenn økta", action: toggleRejected.bind(null, w.id), danger: !w.rejected }] : []),
+              ]}
+            />
           )}
         </div>
       </div>

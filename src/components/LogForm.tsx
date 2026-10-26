@@ -156,7 +156,7 @@ export function LogForm({
       )}
       {task && task.auto.includes(sport) && <p className="rounded-xl bg-ok-soft p-3 text-sm font-semibold text-ok">✓ Denne typen økt oppfyller ukeskravet automatisk.</p>}
 
-      <div className="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] -mx-4 border-t border-line bg-card/95 px-4 pt-3 pb-3 backdrop-blur sm:bottom-0">
+      <div className="sticky bottom-[calc(88px+env(safe-area-inset-bottom))] -mx-4 border-t border-line bg-card/95 px-4 pt-3 pb-3 backdrop-blur sm:bottom-0">
         {state?.error && <p className="mb-2 text-sm font-semibold text-bad">{state.error}</p>}
         <button className="btn btn-heat w-full text-lg disabled:opacity-50" disabled={pending || !ready}>
           {pending ? "Lagrer …" : ready ? "Registrer og sjekk inn" : !duration ? "Velg hvor lenge" : "Legg ved et bilde"}

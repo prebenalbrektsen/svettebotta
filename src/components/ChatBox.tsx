@@ -21,7 +21,7 @@ export function ChatBox() {
     <form
       ref={form}
       action={action}
-      className="chat-input fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-3xl gap-2 border-t border-line bg-paper/95 px-4 py-2 backdrop-blur sm:bottom-0"
+      className="chat-input fixed inset-x-0 bottom-[calc(84px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-3xl gap-2 border-t border-line bg-paper/95 px-4 py-2 backdrop-blur sm:bottom-0"
     >
       <textarea
         name="body"

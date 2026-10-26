@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ActionForm, CopyLink } from "@/components/ActionForm";
 import { AddParticipantForm } from "@/components/AddParticipantForm";
+import { ActionMenu } from "@/components/ActionMenu";
 import { Icon } from "@/components/Icon";
 import { requireAdmin } from "@/lib/auth";
 import { activeChallenge, loadBoard, type Challenge } from "@/lib/challenge";
@@ -283,13 +284,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         </p>
                       </div>
                       {!u.is_admin && (
-                        <details data-menu className="relative">
-                          <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full bg-line/60" aria-label={`Valg for ${u.name}`}><Icon name="more" className="h-4 w-4" /></summary>
-                          <div className="absolute right-0 z-10 mt-1 flex w-60 flex-col rounded-xl border border-line bg-card p-1 shadow-lg">
-                            <form action={newInvite.bind(null, u.id)}><button className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-line/50">Ny innloggingslenke (glemt passord)</button></form>
-                            {c && <form action={toggleMember.bind(null, u.id)}><button className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-line/50">{memberIds.has(u.id) ? `Ta ut av ${c.name}` : `Meld på ${c.name}`}</button></form>}
-                          </div>
-                        </details>
+                        <ActionMenu
+                          label={`Valg for ${u.name}`}
+                          items={[
+                            { label: "Ny innloggingslenke (glemt passord)", action: newInvite.bind(null, u.id) },
+                            ...(c ? [{ label: memberIds.has(u.id) ? `Ta ut av ${c.name}` : `Meld på ${c.name}`, action: toggleMember.bind(null, u.id) }] : []),
+                          ]}
+                        />
                       )}
                     </div>
                     {c?.join_mode === "selected" && !memberIds.has(u.id) && (

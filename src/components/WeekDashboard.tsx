@@ -15,7 +15,7 @@ export function ProgressRing({ c, r, size = 104 }: { c: Challenge; r: WeekResult
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--color-line)" strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={circ * (1 - done / c.min_sessions)} />
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - done / c.min_sessions)} className="ring-fill" style={{ "--circ": circ } as React.CSSProperties} />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
         <span className="display text-3xl leading-none">{done}<span className="text-lg text-muted">/{c.min_sessions}</span></span>
@@ -41,7 +41,7 @@ export function DayDots({ c, r, week, size = "md" }: { c: Challenge; r: WeekResu
         const credit = counted ? workoutCredit(c, counted) : 0;
         const fill = counted ? (r.passed ? "bg-ok text-white" : "bg-heat text-white") : pending ? "border-2 border-warn" : day > today ? "bg-line/40" : "bg-line";
         return (
-          <span key={day} className={`grid ${px} place-items-center rounded-full font-bold ${fill}`}
+          <span key={day} className={`grid ${px} place-items-center rounded-full font-bold ${fill} ${counted || pending ? "pop" : ""}`} style={{ animationDelay: `${250 + i * 45}ms` }}
             title={counted ? `${counted.duration_min} min` : pending ? "Venter på innsjekk" : undefined}>
             {credit > 1 ? credit : ""}
           </span>

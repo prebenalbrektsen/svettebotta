@@ -3,7 +3,7 @@ import { ChatBox, ScrollToEnd } from "@/components/ChatBox";
 import { RoleTag } from "@/components/RoleTag";
 import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { Icon } from "@/components/Icon";
+import { ActionMenu } from "@/components/ActionMenu";
 import { dayHeading, osloDate } from "@/lib/time";
 import { deleteMessage } from "../actions";
 
@@ -45,12 +45,7 @@ export default async function ChatPage() {
                 <div className={`mt-0.5 flex items-center justify-end gap-1 text-[11px] ${mine ? "text-white/80" : "text-muted"}`}>
                   {timeFmt.format(new Date(m.created_at))}
                   {(mine || user.is_admin) && (
-                    <details data-menu className="relative">
-                      <summary className="grid h-6 w-6 cursor-pointer list-none place-items-center rounded-full" aria-label="Valg for meldingen"><Icon name="more" className="h-3.5 w-3.5" /></summary>
-                      <form action={deleteMessage.bind(null, m.id)} className="absolute right-0 z-10 mt-1 rounded-xl border border-line bg-card p-1 shadow-lg">
-                        <button className="rounded-lg px-3 py-2 text-sm whitespace-nowrap text-bad hover:bg-line/50">Slett melding</button>
-                      </form>
-                    </details>
+                    <ActionMenu small label="Valg for meldingen" items={[{ label: "Slett melding", action: deleteMessage.bind(null, m.id), danger: true }]} />
                   )}
                 </div>
               </div>

@@ -13,7 +13,8 @@ import { one, query } from "@/lib/db";
 import { sportIcon, sportLabel } from "@/lib/sports";
 import { fmtKm } from "@/lib/stats";
 import { ago, formatMinutes, mondayOf, osloDate, relativeTime } from "@/lib/time";
-import { deleteComment, toggleKudos } from "../../actions";
+import { deleteComment } from "../../actions";
+import { KudosButton } from "@/components/KudosButton";
 
 export default async function WorkoutPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -96,13 +97,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {w.checked_in_at && (
-          <form action={toggleKudos.bind(null, w.id)}>
-            <button className={`btn ${w.kudos_by.includes(user.id) ? "btn-heat" : "btn-ghost"}`} disabled={mine}>
-              <Icon name="flame" className="h-4 w-4" />{w.kudos_by.length} kudos
-            </button>
-          </form>
-        )}
+        {w.checked_in_at && <KudosButton workoutId={w.id} given={w.kudos_by.includes(user.id)} count={w.kudos_by.length} own={mine} big />}
         {kudosNames.length > 0 && <span className="text-sm text-muted">fra {kudosNames.map((k) => k.name).join(", ")}</span>}
         {(mine || user.is_admin) && <CheckIn workoutId={w.id} checkedIn={!!w.checked_in_at} hasPhoto={w.has_proof} proofRequired={c?.proof_required ?? true} />}
       </div>

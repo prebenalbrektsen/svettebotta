@@ -1,3 +1,4 @@
+import { Count } from "@/components/Count";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import Link from "next/link";
 import { statusLabel } from "@/components/WeekProgress";
@@ -94,7 +95,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   const medal = ["🥇", "🥈", "🥉"];
 
   return (
-    <div className="space-y-4 pt-2">
+    <div className="stagger space-y-4 pt-2">
       {logget && <p className="rounded-xl bg-ok-soft px-4 py-3 font-semibold text-ok">Økta er registrert. Sterkt! 💪</p>}
 
       {pendingUsers > 0 && (
@@ -265,11 +266,11 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
       <section className="grid grid-cols-2 gap-3">
         <div className="card p-4">
           <p className="text-xs font-bold tracking-wider text-muted uppercase">Betalt inn</p>
-          <p className="display mt-1 text-3xl">{potPaid} kr</p>
+          <p className="display mt-1 text-3xl"><Count value={potPaid} suffix=" kr" /></p>
         </div>
         <div className="card p-4">
           <p className="text-xs font-bold tracking-wider text-muted uppercase">Ikke betalt ennå</p>
-          <p className={`display mt-1 text-3xl ${potOpen ? "text-bad" : ""}`}>{potOpen} kr</p>
+          <p className={`display mt-1 text-3xl ${potOpen ? "text-bad" : ""}`}><Count value={potOpen} suffix=" kr" /></p>
         </div>
       </section>
     </div>
