@@ -22,7 +22,7 @@ export default async function ChatPage() {
   await query("update users set chat_seen_at = now() where id = $1", [user.id]);
 
   return (
-    <div className="pt-1 pb-24">
+    <div className="pt-1 pb-28">
       <h1 className="display text-3xl">Garderoben</h1>
       <ul className="mt-3 space-y-2">
         {messages.map((m, i) => {

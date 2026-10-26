@@ -87,7 +87,7 @@ body {
 
 /* Chat: while the message box has focus, drop the tab bar and let the input sit on the keyboard. */
 html[data-typing] .tab-bar { display: none; }
-html[data-typing] .chat-input { bottom: 0; padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+html[data-typing] .chat-input { bottom: calc(10px + env(safe-area-inset-bottom)); }
 
 /* In the components layer so Tailwind utilities (w-24, bg-ok …) can override them. */
 @layer components {

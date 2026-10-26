@@ -15,12 +15,12 @@ export function ChatBox() {
     <form
       ref={form}
       action={action}
-      className="chat-input fixed inset-x-0 bottom-[calc(84px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-3xl gap-2 border-t border-line bg-paper/95 px-4 py-2 backdrop-blur sm:bottom-0"
+      className="chat-input glass fixed inset-x-3 bottom-[calc(98px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-md items-end gap-2 rounded-[26px] p-1.5 sm:bottom-6 sm:max-w-2xl"
     >
       <textarea
         name="body"
         rows={1}
-        className="field max-h-32 flex-1 resize-none"
+        className="max-h-32 min-h-11 flex-1 resize-none rounded-[20px] bg-transparent px-3.5 py-2.5 text-base outline-none placeholder:text-muted"
         placeholder="Skriv til gjengen …"
         // While typing, the tab bar hides so the keyboard + input don't eat the whole screen.
         onFocus={() => document.documentElement.setAttribute("data-typing", "")}
@@ -34,7 +34,7 @@ export function ChatBox() {
         }}
         required
       />
-      <button className="btn btn-heat" disabled={pending}>Send</button>
+      <button className="btn btn-heat h-11 rounded-full px-5" disabled={pending}>Send</button>
     </form>
   );
 }

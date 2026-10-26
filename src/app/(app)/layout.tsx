@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
   return (
     <div className="mx-auto min-h-dvh max-w-3xl pb-[calc(104px+env(safe-area-inset-bottom))] sm:pb-10">
-      <header className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-2">
+      <header className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6 sm:pt-6 sm:pb-8">
         <Link href="/"><Logo /></Link>
         <div className="hidden sm:block"><NavLinks isAdmin={user.is_admin} unread={unread!.n} onStrava={!!user.strava_athlete_id} adminBadge={pendingUsers} /></div>
       </header>
