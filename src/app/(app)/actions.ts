@@ -288,6 +288,16 @@ export async function toggleMember(userId: number): Promise<void> {
   revalidatePath("/", "layout");
 }
 
+/** Someone who joined mid-week counts from next week; this lets the current week count too. */
+export async function countThisWeek(userId: number): Promise<void> {
+  await requireAdmin();
+  const c = await activeChallenge();
+  if (!c) return;
+  const monday = fromOsloLocal(`${mondayOf(osloDate())}T00:00`);
+  await query("update challenge_members set joined_at = $3 where challenge_id = $1 and user_id = $2 and joined_at > $3", [c.id, userId, monday]);
+  revalidatePath("/", "layout");
+}
+
 export async function saveTask(_: ActionState, form: FormData): Promise<ActionState> {
   await requireAdmin();
   const c = await activeChallenge();

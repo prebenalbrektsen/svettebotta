@@ -11,7 +11,7 @@ import { stravaConfigured, webhookStatus } from "@/lib/strava";
 import { ActivateWebhook } from "@/components/ActivateWebhook";
 import { addDays, ago, formatWeekRange, isoWeekNumber, mondayOf, osloDate, relativeTime } from "@/lib/time";
 import { sportLabel } from "@/lib/sports";
-import { activateStravaWebhook, adminSyncStrava, approveUser, removeInvite, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember } from "../actions";
+import { activateStravaWebhook, adminSyncStrava, approveUser, removeInvite, confirmAllClaimed, createGroupLink, disableGroupLink, rejectUser, deleteTask, newInvite, saveChallenge, saveTask, setFine, settleAll, toggleInvite, toggleMember, countThisWeek } from "../actions";
 
 const TABS = [
   { id: "boter", label: "Bøter" },
@@ -100,6 +100,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const pending = allUsers.filter((u) => !u.approved);
   const groupToken = (await query<{ value: string }>("select value from settings where key = 'group_invite'"))[0]?.value ?? null;
   const memberIds = new Set(board?.members.map((m) => m.id));
+  // Joined mid-week: not counted until next Monday, unless the admin lets this week count.
+  const waiting = new Set(board?.members.filter((m) => m.results.find((r) => r.week === board.currentWeek)?.state === "before").map((m) => m.id));
   const invited = new Set(
     c ? (await query<{ user_id: number }>("select user_id from challenge_invites where challenge_id = $1", [c.id])).map((r) => r.user_id) : [],
   );
@@ -307,7 +309,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         <p className="text-xs text-muted">
                           {u.invite_token && !u.email ? "Har ikke åpnet invitasjonen ennå" : u.email}
                           {u.strava && " · Strava ✓"}
-                          {c && (memberIds.has(u.id) ? ` · med i ${c.name}` : c.join_mode === "selected" && !invited.has(u.id) ? " · har ikke tilgang til utfordringen" : " · ikke påmeldt ennå")}
+                          {c && (memberIds.has(u.id) ? ` · med i ${c.name}${waiting.has(u.id) ? " fra neste uke" : ""}` : c.join_mode === "selected" && !invited.has(u.id) ? " · har ikke tilgang til utfordringen" : " · ikke påmeldt ennå")}
                         </p>
                       </div>
                       {!u.is_admin && (
@@ -317,6 +319,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                             { label: u.activated ? "Ny innloggingslenke (glemt passord)" : "Ny invitasjonslenke", action: newInvite.bind(null, u.id) },
                             ...(!u.activated ? [{ label: "Fjern invitasjonen", action: removeInvite.bind(null, u.id), danger: true }] : []),
                             ...(c ? [{ label: memberIds.has(u.id) ? `Ta ut av ${c.name}` : `Meld på ${c.name}`, action: toggleMember.bind(null, u.id) }] : []),
+                            ...(board && waiting.has(u.id) ? [{ label: `La uke ${isoWeekNumber(board.currentWeek)} telle`, action: countThisWeek.bind(null, u.id) }] : []),
                           ]}
                         />
                       )}
