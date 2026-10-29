@@ -7,7 +7,7 @@ import { Icon } from "@/components/Icon";
 import { requireAdmin } from "@/lib/auth";
 import { activeChallenge, loadBoard, type Challenge } from "@/lib/challenge";
 import { query } from "@/lib/db";
-import { stravaConfigured, webhookStatus } from "@/lib/strava";
+import { stravaConfigured, webhookStatus, webhookUrl } from "@/lib/strava";
 import { ActivateWebhook } from "@/components/ActivateWebhook";
 import { addDays, ago, formatWeekRange, isoWeekNumber, mondayOf, osloDate, relativeTime } from "@/lib/time";
 import { sportLabel } from "@/lib/sports";
@@ -349,6 +349,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <h2 className="font-bold">Strava</h2>
                 {!stravaConfigured() ? (
                   <p className="text-sm text-muted">Ikke satt opp ennå: legg inn STRAVA_CLIENT_ID og STRAVA_CLIENT_SECRET i Vercel og deploy på nytt.</p>
+                ) : webhook && webhook.callback_url !== webhookUrl() ? (
+                  <>
+                    <p className="text-sm text-muted">Sanntids-synken går fortsatt til den gamle adressen ({webhook.callback_url.replace(/^https?:\/\//, "").split("/")[0]}), så øktene hentes bare hvert 10. minutt. Flytt den hit, så kommer de inn med en gang igjen.</p>
+                    <ActivateWebhook action={activateStravaWebhook} label="Flytt sanntids-synk til ny adresse" />
+                  </>
                 ) : webhook ? (
                   <p className="text-sm"><strong className="text-ok">✓ Tilkoblet med sanntids-synk.</strong> <span className="text-muted">Nye økter kommer inn sekunder etter at de er lagret på Strava. {connected} {connected === 1 ? "deltaker har" : "deltakere har"} koblet til.</span></p>
                 ) : (

@@ -40,7 +40,7 @@ export async function push(userIds: number[], category: Category | "test", paylo
     if (!subs.length) return;
     const { publicKey, privateKey } = await vapidKeys();
     // The push services want an https: contact for the sender; locally APP_URL is plain http.
-    const subject = process.env.APP_URL?.startsWith("https://") ? process.env.APP_URL : "https://svettebotta.vercel.app";
+    const subject = process.env.APP_URL?.startsWith("https://") ? process.env.APP_URL : "https://treningsutfordring.vercel.app";
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const body = JSON.stringify({ url: "/", ...payload });
     await Promise.all(

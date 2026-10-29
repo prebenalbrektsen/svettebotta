@@ -183,11 +183,24 @@ export async function webhookStatus(): Promise<{ id: number; callback_url: strin
   return list[0] ?? null;
 }
 
-/** Creates the subscription. Strava immediately calls our GET endpoint to check the token. */
+/** Where Strava should send its webhook calls: this app's current address. */
+export function webhookUrl(): string {
+  return `${process.env.APP_URL}${CALLBACK_PATH}`;
+}
+
+/**
+ * Creates the subscription. Strava immediately calls our GET endpoint to check the token.
+ * One pointing at an old address (the app moved) is removed first, since Strava allows only one.
+ */
 export async function subscribeWebhook(): Promise<{ ok: boolean; message: string }> {
+  const old = await webhookStatus();
+  if (old && old.callback_url !== webhookUrl()) {
+    const del = await fetch(`${API}/push_subscriptions/${old.id}?${new URLSearchParams(appCredentials())}`, { method: "DELETE" });
+    if (!del.ok) return { ok: false, message: `Fikk ikke fjernet den gamle sanntids-synken (${del.status}).` };
+  }
   const res = await fetch(`${API}/push_subscriptions`, {
     method: "POST",
-    body: new URLSearchParams({ ...appCredentials(), callback_url: `${process.env.APP_URL}${CALLBACK_PATH}`, verify_token: webhookVerifyToken() }),
+    body: new URLSearchParams({ ...appCredentials(), callback_url: webhookUrl(), verify_token: webhookVerifyToken() }),
   });
   const body = await res.text();
   return res.ok ? { ok: true, message: "Sanntids-synk er på." } : { ok: false, message: `Strava sa nei (${res.status}): ${body.slice(0, 200)}` };
