@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
 import { PasskeyLogin } from "@/components/Passkeys";
 import { Logo } from "@/components/Logo";
+import { movedNotice } from "@/lib/moved";
 import { currentUser } from "@/lib/auth";
 import { hasUsers, login, setupAdmin } from "../auth-actions";
 
@@ -12,6 +13,18 @@ export default async function LoginPage() {
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col px-4 pt-[12vh] pb-10">
       <Logo size="lg" />
       <p className="mt-3 mb-8 text-muted">Svett, logg det – eller betal.</p>
+      {movedNotice() && !firstRun && (
+        <section className="mb-4 rounded-2xl bg-heat-soft p-4 text-sm text-ink">
+          <p className="font-bold">📣 Ny adresse og nytt navn</p>
+          <p className="mt-1">Svettebøtta heter nå Treningsutfordring. Alt er som før, men du må:</p>
+          <ol className="mt-2 list-decimal space-y-0.5 pl-5">
+            <li>Logge inn med <strong>passord</strong> – Face ID virker ikke her ennå</li>
+            <li>Slette den gamle appen og legge denne på hjemskjermen</li>
+            <li>Slå på varsler og Face ID igjen under <strong>Meg</strong></li>
+          </ol>
+          <p className="mt-2 text-muted">Glemt passordet? Be admin om en ny innloggingslenke.</p>
+        </section>
+      )}
       <div className="card p-5">
         {firstRun ? (
           <>

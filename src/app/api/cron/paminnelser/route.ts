@@ -1,6 +1,7 @@
 import { activeChallenge, checkInDeadline, loadBoard, evaluateWeek, firstCountedWeek, WORKOUT_COLUMNS, type WeeklyTask, type Workout } from "@/lib/challenge";
 import { query } from "@/lib/db";
-import { once, push } from "@/lib/push";
+import { movedNotice } from "@/lib/moved";
+import { everyoneBut, once, push } from "@/lib/push";
 import { sportLabel } from "@/lib/sports";
 import { addDays, mondayOf, osloDate } from "@/lib/time";
 
@@ -15,6 +16,15 @@ const osloWeekday = () => new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/O
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Nei", { status: 401 });
+  }
+  // One-time heads-up about the new address (see lib/moved.ts), sent to every phone, whatever its settings.
+  if (movedNotice() && (await once("moved:treningsutfordring"))) {
+    await push(await everyoneBut(null), "test", {
+      title: "📣 Ny adresse: treningsutfordring.vercel.app",
+      body: "Appen heter nå Treningsutfordring. Logg inn med passord, og legg appen på hjemskjermen på nytt.",
+      url: "/login",
+      tag: "moved",
+    });
   }
   const c = await activeChallenge();
   if (!c) return Response.json({ skipped: "ingen utfordring" });
