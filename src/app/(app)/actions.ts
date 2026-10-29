@@ -481,8 +481,8 @@ export async function approveUser(userId: number): Promise<void> {
   await requireAdmin();
   const u = await one<{ name: string }>("update users set approved = true where id = $1 and not approved returning name", [userId]);
   if (u) {
-    await query("insert into messages (user_id, body) values (null, $1)", [`👋 ${u.name} er med i Svettebøtta!`]);
-    after(() => push([userId], "test", { title: "Du er godkjent! 🎉", body: "Velkommen i Svettebøtta – trykk for å komme i gang.", url: "/velkommen" }));
+    await query("insert into messages (user_id, body) values (null, $1)", [`👋 ${u.name} er med i Treningsutfordring!`]);
+    after(() => push([userId], "test", { title: "Du er godkjent! 🎉", body: "Velkommen i Treningsutfordring – trykk for å komme i gang.", url: "/velkommen" }));
   }
   revalidatePath("/", "layout");
 }
@@ -506,7 +506,7 @@ export async function sendTestPush(): Promise<void> {
   const user = await requireUser();
   const subs = await one<{ n: number }>("select count(*)::int as n from push_subscriptions where user_id = $1", [user.id]);
   if (!subs?.n) return;
-  await push([user.id], "test", { title: "Svettebøtta 💪", body: "Varsler virker! Nå får du beskjed om kudos, innsjekk og påminnelser.", url: "/meg", tag: "test" });
+  await push([user.id], "test", { title: "Treningsutfordring 💪", body: "Varsler virker! Nå får du beskjed om kudos, innsjekk og påminnelser.", url: "/meg", tag: "test" });
 }
 
 /**

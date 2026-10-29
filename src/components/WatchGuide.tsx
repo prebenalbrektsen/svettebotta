@@ -1,4 +1,4 @@
-/** How each kind of watch gets its workouts into Strava (and so into Svettebøtta). */
+/** How each kind of watch gets its workouts into Strava (and so into Treningsutfordring). */
 export function WatchGuide() {
   const steps = [
     { title: "Garmin", text: "Garmin Connect-appen → Innstillinger (⋯ Mer) → Tilkoblede apper → Strava → Koble til. Øktene går automatisk videre etterpå." },

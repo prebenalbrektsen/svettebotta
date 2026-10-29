@@ -1,11 +1,11 @@
-// Svettebøtta service worker: shows push notifications and opens the right screen when tapped.
+// Treningsutfordring service worker: shows push notifications and opens the right screen when tapped.
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener("push", (event) => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch { data = { title: "Svettebøtta", body: event.data && event.data.text() }; }
-  const title = data.title || "Svettebøtta";
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: "Treningsutfordring", body: event.data && event.data.text() }; }
+  const title = data.title || "Treningsutfordring";
   event.waitUntil(Promise.all([
     self.registration.showNotification(title, {
       body: data.body || "",

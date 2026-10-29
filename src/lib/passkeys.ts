@@ -40,7 +40,7 @@ export async function registrationOptions(user: { id: number; name: string; emai
   const { rpID } = await relyingParty();
   const existing = await query<{ credential_id: string }>("select credential_id from passkeys where user_id = $1", [user.id]);
   const options = await generateRegistrationOptions({
-    rpName: "Svettebøtta",
+    rpName: "Treningsutfordring",
     rpID,
     userID: new TextEncoder().encode(String(user.id)),
     userName: user.email ?? user.name,

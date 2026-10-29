@@ -7,9 +7,9 @@ const display = Anton({ weight: "400", subsets: ["latin"], variable: "--font-dis
 const body = Barlow({ weight: ["400", "500", "600", "700"], subsets: ["latin"], variable: "--font-body-family" });
 
 export const metadata: Metadata = {
-  title: "Svettebøtta",
+  title: "Treningsutfordring",
   description: "Familiens treningsutfordring – økter, bøter og statistikk.",
-  appleWebApp: { capable: true, title: "Svettebøtta", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Treningsutfordring", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

@@ -35,7 +35,7 @@ export function CopyLink({ url, big }: { url: string; big?: boolean }) {
       onClick={async (e) => {
         const btn = e.currentTarget;
         if (navigator.share) {
-          await navigator.share({ title: "Bli med i Svettebøtta", url }).catch(() => {});
+          await navigator.share({ title: "Bli med i Treningsutfordring", url }).catch(() => {});
           return;
         }
         await navigator.clipboard.writeText(url);

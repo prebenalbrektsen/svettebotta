@@ -77,6 +77,6 @@ export async function joinViaGroupLink(_: FormState, form: FormData): Promise<Fo
     [name, email, await hashPassword(password), colors[count!.n % colors.length]],
   );
   await startSession(user!.id);
-  after(async () => push(await admins(), "admin", { title: "👋 Ny deltaker venter", body: `${name} vil bli med i Svettebøtta`, url: "/admin?fane=deltakere" }));
+  after(async () => push(await admins(), "admin", { title: "👋 Ny deltaker venter", body: `${name} vil bli med i Treningsutfordring`, url: "/admin?fane=deltakere" }));
   redirect("/venter");
 }

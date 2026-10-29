@@ -68,7 +68,7 @@ export function PushSettings({ categories, prefs, compact }: { categories: Recor
     state === "loading" ? null :
     state === "install-first" ? <p className="text-sm text-muted">På iPhone kommer varsler bare når appen er lagt på hjemskjermen. Legg den til (se veiledningen på forsiden), åpne den derfra og kom tilbake hit.</p> :
     state === "unsupported" ? <p className="text-sm text-muted">Denne nettleseren støtter ikke varsler. Prøv fra appen på hjemskjermen.</p> :
-    state === "denied" ? <p className="text-sm text-muted">Varsler er blokkert for Svettebøtta. Slå dem på i telefonens Innstillinger → Varslinger → Svettebøtta.</p> :
+    state === "denied" ? <p className="text-sm text-muted">Varsler er blokkert for Treningsutfordring. Slå dem på i telefonens Innstillinger → Varslinger → Treningsutfordring.</p> :
     state === "off" ? <button type="button" className="btn btn-heat w-full" disabled={busy} onClick={enable}>{busy ? "Venter …" : "Slå på varsler"}</button> :
     (
       <div className="flex flex-wrap items-center gap-2">

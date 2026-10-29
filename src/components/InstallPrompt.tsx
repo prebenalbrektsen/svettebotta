@@ -64,7 +64,7 @@ export function InstallPrompt({ variant = "card" }: { variant?: "card" | "banner
       </>
     ) : platform === "android" && deferred ? (
       <>
-        <p className="font-bold">Legg Svettebøtta på hjemskjermen</p>
+        <p className="font-bold">Legg Treningsutfordring på hjemskjermen</p>
         <p className="mt-1 text-sm">Da åpnes den som en vanlig app – uten nettleser rundt.</p>
         <button
           type="button"
@@ -81,12 +81,12 @@ export function InstallPrompt({ variant = "card" }: { variant?: "card" | "banner
       </>
     ) : platform === "android" ? (
       <>
-        <p className="font-bold">Legg Svettebøtta på hjemskjermen</p>
+        <p className="font-bold">Legg Treningsutfordring på hjemskjermen</p>
         <p className="mt-1 text-sm">Trykk <strong>⋮</strong> øverst til høyre i Chrome → <strong>«Legg til på startskjermen»</strong>.</p>
       </>
     ) : (
       <>
-        <p className="font-bold">Legg Svettebøtta på hjemskjermen</p>
+        <p className="font-bold">Legg Treningsutfordring på hjemskjermen</p>
         <ol className="mt-2 space-y-1.5 text-sm">
           <li>1. Trykk <ShareIcon /> <strong>Del</strong> nederst i Safari</li>
           <li>2. Bla ned og velg <strong>«Legg til på Hjem-skjerm»</strong></li>

@@ -1,9 +1,9 @@
-# Svettebøtta
+# Treningsutfordring
 
 *A weekly workout challenge for groups of friends: miss your workouts, pay into the bucket.*
 
-Svettebøtta er en treningsutfordring for familie, venner eller jobben. Dere blir enige om ukas
-krav (for eksempel tre økter på 30 minutter), og den som ikke klarer det, betaler bot til
+Treningsutfordring er en app for ukentlig trening sammen med familie, venner eller jobben. Dere
+blir enige om ukas krav (for eksempel tre økter på 30 minutter), og den som ikke klarer det, betaler bot til
 bøtekassa. Appen henter økter fra Strava, holder styr på bøtene og har statistikk, kudos og
 gruppechat.
 

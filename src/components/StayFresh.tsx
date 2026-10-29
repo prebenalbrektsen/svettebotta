@@ -42,7 +42,7 @@ export function StayFresh({ version }: { version: string }) {
           onClick={() => window.location.reload()}
           className="glass fixed inset-x-3 top-[calc(10px+env(safe-area-inset-top))] z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-full px-4 py-3 text-left text-sm font-semibold"
         >
-          <span>✨ Ny versjon av Svettebøtta</span>
+          <span>✨ Ny versjon av Treningsutfordring</span>
           <span className="rounded-full bg-heat px-3 py-1 text-white">Oppdater</span>
         </motion.button>
       )}

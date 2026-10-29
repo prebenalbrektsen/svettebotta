@@ -15,7 +15,7 @@ export default async function GroupJoinPage({ params }: { params: Promise<{ toke
       <div className="card mt-4 p-5">
         {valid ? (
           <>
-            <h1 className="mb-1 text-lg font-bold">Bli med i Svettebøtta</h1>
+            <h1 className="mb-1 text-lg font-bold">Bli med i Treningsutfordring</h1>
             <p className="mb-4 text-sm text-muted">Lag en konto, så slipper kontrolløren deg inn.</p>
             <AuthForm
               action={joinViaGroupLink}
