@@ -2,7 +2,7 @@ import type { User } from "./auth";
 import { activeChallenge, annotate, WORKOUT_COLUMNS, type Workout } from "./challenge";
 import { one, query } from "./db";
 
-export type Badges = { "/": number; "/logg": number; "/prat": number; "/admin": number };
+type Badges = { "/": number; "/logg": number; "/prat": number; "/admin": number };
 
 /** The numbers on the tab bar: new kudos/comments, workouts to check in, unread chat, admin to-dos. */
 export async function badgesFor(user: User): Promise<{ badges: Badges; avatarV: number | null }> {

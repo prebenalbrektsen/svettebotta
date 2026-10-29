@@ -12,7 +12,7 @@ export const CATEGORIES = {
   reminders: "Påminnelse når uka holder på å glippe",
   admin: "Til kontrolløren: nye deltakere og meldte betalinger",
 } as const;
-export type Category = keyof typeof CATEGORIES;
+type Category = keyof typeof CATEGORIES;
 
 type Payload = { title: string; body: string; url?: string; tag?: string };
 

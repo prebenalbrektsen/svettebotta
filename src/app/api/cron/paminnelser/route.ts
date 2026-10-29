@@ -7,13 +7,13 @@ import { addDays, mondayOf, osloDate } from "@/lib/time";
 // Scheduled reminders (vercel.json runs this a few times a day, never at night):
 // - a workout's check-in deadline is coming up within 4 hours
 // - Sunday evening: your week isn't in the bag yet
-// Each reminder is sent once (push_sent). Vercel signs the call with CRON_SECRET.
+// Each reminder is sent once (push_sent). Vercel signs the call with CRON_SECRET; without it set, nothing runs.
 
 const osloHour = () => Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", hour: "numeric", hourCycle: "h23" }).format(new Date()));
 const osloWeekday = () => new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", weekday: "short" }).format(new Date());
 
 export async function GET(request: Request) {
-  if (process.env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Nei", { status: 401 });
   }
   const c = await activeChallenge();

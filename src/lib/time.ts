@@ -31,7 +31,6 @@ export function isoWeekNumber(monday: string): number {
 }
 
 const dayFmt = new Intl.DateTimeFormat("nb-NO", { timeZone: TZ, day: "numeric", month: "short" });
-const dateTimeFmt = new Intl.DateTimeFormat("nb-NO", { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function formatDay(date: string): string {
   return dayFmt.format(new Date(`${date}T12:00:00Z`));
@@ -39,10 +38,6 @@ export function formatDay(date: string): string {
 
 export function formatWeekRange(monday: string): string {
   return `${formatDay(monday)}–${formatDay(addDays(monday, 6))}`;
-}
-
-export function formatDateTime(at: Date): string {
-  return dateTimeFmt.format(at);
 }
 
 export function formatMinutes(min: number): string {

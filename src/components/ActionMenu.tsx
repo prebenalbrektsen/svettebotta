@@ -4,7 +4,7 @@ import { Menu } from "@animate-ui/react/primitives/base-ui/menu";
 import { useTransition } from "react";
 import { Icon } from "./Icon";
 
-export type MenuAction = { label: string; action: () => Promise<void>; danger?: boolean };
+type MenuAction = { label: string; action: () => Promise<void>; danger?: boolean };
 
 /** The ⋯ menu: an animated popup (Animate UI on Base UI) that closes on outside tap and Escape. */
 export function ActionMenu({ items, label = "Flere valg", small }: { items: MenuAction[]; label?: string; small?: boolean }) {

@@ -18,7 +18,7 @@ const face: React.CSSProperties = { backfaceVisibility: "hidden", WebkitBackface
 const back: React.CSSProperties = { ...face, transform: "rotateY(180deg)" };
 
 /** The joker as a two-sided playing card: the face, and a dark back with the bucket. */
-export function JokerCard({ small }: { small?: boolean }) {
+function JokerCard({ small }: { small?: boolean }) {
   const size = small ? "h-40 w-28 rounded-xl" : "h-80 w-56 rounded-[22px]";
   return (
     <div className={`relative ${size}`} style={{ transformStyle: "preserve-3d" }}>

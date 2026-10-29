@@ -12,7 +12,7 @@ export function stravaConfigured(): boolean {
   return !!(process.env.STRAVA_CLIENT_ID && process.env.STRAVA_CLIENT_SECRET);
 }
 
-export function redirectUri(): string {
+function redirectUri(): string {
   return `${process.env.APP_URL}/api/strava/callback`;
 }
 
@@ -140,7 +140,7 @@ export async function syncStrava(userId: number, since: Date): Promise<number> {
  * (real watch data), but carry over the photo, weekly-task tick, kudos and comments from the
  * manual one, so it is never counted twice. "Same workout" = started within 90 minutes.
  */
-export async function mergeManualDuplicate(userId: number, stravaWorkoutId: number, startDate: string): Promise<void> {
+async function mergeManualDuplicate(userId: number, stravaWorkoutId: number, startDate: string): Promise<void> {
   const manual = await one<{ id: number }>(
     `select id from workouts
       where user_id = $1 and source = 'manual' and abs(extract(epoch from started_at - $2::timestamptz)) < 90 * 60
@@ -212,6 +212,20 @@ export async function handleWebhookEvent(e: WebhookEvent): Promise<void> {
   }
 }
 
+/** True when Strava itself no longer accepts this person's tokens. */
+async function accessRevoked(userId: number): Promise<boolean> {
+  try {
+    const token = await accessToken(userId);
+    if (!token) return true;
+    const res = await fetch(`${API}/athlete`, { headers: { authorization: `Bearer ${token}` } });
+    return res.status === 401;
+  } catch (err) {
+    return /^Strava token 4\d\d/.test((err as Error).message);
+  }
+}
+
+// Strava doesn't sign webhook calls, and the URL and athlete ids are no secret, so anyone can
+// send one. Nothing is deleted or disconnected until Strava itself confirms it.
 async function handleWebhookEventInner(e: WebhookEvent): Promise<void> {
   const user = await one<{ id: number }>("select id from users where strava_athlete_id = $1", [e.owner_id]);
   // Strava still thinks this person is connected, but the app never got their tokens
@@ -220,19 +234,21 @@ async function handleWebhookEventInner(e: WebhookEvent): Promise<void> {
   if (e.object_type === "athlete") {
     // The person revoked access on strava.com.
     if (e.updates?.authorized === "false") {
+      if (!(await accessRevoked(user.id))) return logEvent(e, user.id, "frakobling som Strava ikke bekrefter – ignorert");
       await query("update users set strava_athlete_id = null, strava_access_token = null, strava_refresh_token = null, strava_expires_at = null where id = $1", [user.id]);
       return logEvent(e, user.id, "koblet fra på strava.com");
     }
     return logEvent(e, user.id, "profilendring – ignorert");
   }
-  if (e.aspect_type === "delete") {
-    // Deleted on Strava: drop it, unless it was already checked in (then the photo is the proof).
-    const gone = await query("delete from workouts where strava_id = $1 and checked_in_at is null returning 1", [e.object_id]);
-    return logEvent(e, user.id, gone.length ? "slettet økta" : "slettet på Strava – beholdt (allerede sjekket inn)");
-  }
   const token = await accessToken(user.id);
   if (!token) return logEvent(e, user.id, "mangler tilgang – personen må koble til Strava på nytt");
   const res = await fetch(`${API}/activities/${e.object_id}`, { headers: { authorization: `Bearer ${token}` } });
+  if (e.aspect_type === "delete") {
+    if (res.status !== 404) return logEvent(e, user.id, "sletting som Strava ikke bekrefter – ignorert");
+    // Deleted on Strava: drop it, unless it was already checked in (then the photo is the proof).
+    const gone = await query("delete from workouts where strava_id = $1 and user_id = $2 and checked_in_at is null returning 1", [e.object_id, user.id]);
+    return logEvent(e, user.id, gone.length ? "slettet økta" : "slettet på Strava – beholdt (allerede sjekket inn)");
+  }
   if (!res.ok) return logEvent(e, user.id, `Strava svarte ${res.status} på henting av økta`);
   const a = (await res.json()) as Activity;
   const added = await importActivity(user.id, a);

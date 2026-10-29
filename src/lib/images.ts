@@ -5,7 +5,7 @@ import sharp from "sharp";
 // position phones put in photos. The browser already shrinks before upload; this is the guarantee.
 const MAX_INPUT = 8_000_000;
 
-export type Proof = { image: Buffer; thumb: Buffer; mime: string };
+type Proof = { image: Buffer; thumb: Buffer; mime: string };
 
 export async function processProof(dataUrl: string): Promise<Proof | { error: string }> {
   const match = dataUrl.match(/^data:image\/(?:jpeg|png|webp|heic|heif);base64,(.+)$/);

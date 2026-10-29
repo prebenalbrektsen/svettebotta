@@ -28,7 +28,7 @@ export type Jokers = { enabled: boolean; held: number; earnedTotal: number; used
  * one joker; you can hold at most `joker_max` at a time (more is simply not banked). You apply them
  * yourself to a finished week to fill missing workouts. Worked out in time order, so the cap holds.
  */
-export function jokersFor(c: Challenge, results: WeekResult[], uses: { count: number; created_at: Date }[], now = new Date()): Jokers {
+function jokersFor(c: Challenge, results: WeekResult[], uses: { count: number; created_at: Date }[], now = new Date()): Jokers {
   const every = c.joker_every ?? 0;
   if (!every) return { enabled: false, held: 0, earnedTotal: 0, used: 0, progress: 0, every: 0, max: c.joker_max };
   const events: { t: number; extra?: number; use?: number }[] = [];
@@ -137,10 +137,6 @@ export function ruleParts(c: Challenge): string[] {
   if (c.joker_every) parts.push(`${c.joker_every === 1 ? "ekstra økt" : `${c.joker_every} ekstra økter`} = 🃏 joker (maks ${c.joker_max} på lur)`);
   parts.push(`bot ${c.penalty_kr} kr`);
   return parts;
-}
-
-export function ruleText(c: Challenge): string {
-  return ruleParts(c).join(" · ");
 }
 
 /** The first week that counts for someone: everything if they joined before the start, else the first full week after joining. */

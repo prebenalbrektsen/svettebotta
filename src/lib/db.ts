@@ -2,7 +2,7 @@ import { Pool, types } from "pg";
 
 // One pool per server process (kept on globalThis so dev hot reloads don't leak connections).
 const globalForPool = globalThis as unknown as { pool?: Pool };
-export const pool = globalForPool.pool ?? new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+const pool = globalForPool.pool ?? new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 globalForPool.pool = pool;
 
 export async function query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {

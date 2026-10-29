@@ -1,53 +1,67 @@
 # Svettebøtta
 
-The family training challenge: weekly workout rules, fines to the Vipps bøtekasse, Strava sync,
-stats and a group chat. Next.js 16 + Postgres (plain SQL migrations), mobile-first, Norwegian UI.
+*A weekly workout challenge for groups of friends: miss your workouts, pay into the bucket.*
 
-## Run locally
+Svettebøtta er en treningsutfordring for familie, venner eller jobben. Dere blir enige om ukas
+krav (for eksempel tre økter på 30 minutter), og den som ikke klarer det, betaler bot til
+bøtekassa. Appen henter økter fra Strava, holder styr på bøtene og har statistikk, kudos og
+gruppechat.
+
+Laget med Next.js og Postgres, for mobilen, på norsk.
+
+## Slik fungerer det
+
+- **Ukeskravet:** et antall økter av en viss lengde, eller én lang økt. Admin bestemmer.
+- **Uka** går fra mandag kl. 00 til søndag kl. 24, norsk tid. Klarer du ikke kravet, blir det bot.
+- **Ukeskrav (valgfritt):** en ekstra oppgave for én uke, som «én økt i vann».
+- **Innsjekk:** økter må sjekkes inn for å telle. Admin kan kreve et bilde som bevis.
+- **Jokere:** ekstra økter blir jokere som kan redde en uke du ikke klarte.
+- **Bøter:** du trykker «Jeg har betalt», og admin bekrefter eller frafaller boten.
+- **Nye deltakere** som blir med midt i en uke, er med fra neste mandag. Admin kan la uka telle likevel.
+
+## Kom i gang lokalt
+
+Du trenger Node 24 og Postgres.
 
 ```sh
 npm install
-npm run db:start      # local Postgres on a unix socket, prints DATABASE_URL for .env
+cp .env.example .env   # fyll inn DATABASE_URL (og resten om du vil)
 npm run db:migrate
-npm run dev           # http://127.0.0.1:3100
+npm run dev            # http://127.0.0.1:3100
 ```
 
-The first account created on /login becomes the admin. Try it out with fake data:
-`npm run db:reset && npm run db:start && npm run db:migrate && npm run seed:demo`
-(log in as preben@demo.no, password demo1234).
+Den første kontoen som lages på /login, blir admin.
 
-## How the rules work
+Vil du prøve med oppdiktede data? Kjør `npm run seed:demo` på en tom database og logg inn som
+`preben@demo.no` med passord `demo1234`.
 
-- A challenge has a period, a fine, and a weekly rule: `min_sessions` workouts of at least
-  `session_minutes`, or one workout of at least `long_session_minutes` (optional). All of it can be
-  changed in Admin, and the fines are recalculated.
-- Weeks run Monday 00:00 to Sunday 24:00, Oslo time. A finished week that missed the rule is a fine.
-- Weekly tasks ("one workout in water") apply to one week: at least one qualifying workout must meet
-  them, either ticked by the participant or automatically by sport (water sports).
-- Fines: owed → participant presses «Jeg har betalt» (claimed) → admin confirms (paid) or waives.
-- Manual workouts need a proof photo. Strava workouts count by themselves; the admin can reject any.
-- Once a week is over, nobody but the admin can log workouts for it.
+`npm run db:start` setter opp en lokal Postgres på Mac (Homebrew, `postgresql@18`).
 
-## Strava
+## Strava (valgfritt)
 
-Garmin, Apple Watch (through the Strava app), Polar, Suunto and Wahoo all sync to Strava, so Strava
-is the only integration.
+Garmin, Apple Watch, Polar, Suunto og Wahoo synker alle til Strava, så Strava er den eneste
+koblingen. Uten Strava logger deltakerne økter selv.
 
-1. Create an API app at https://www.strava.com/settings/api. Set *Authorization Callback Domain* to
-   the app's domain (`127.0.0.1` locally).
-2. Put `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` in `.env`.
-3. In the Strava API settings, raise athlete capacity to 10 (you can do this yourself with a Strava
-   subscription). More than 10 people needs Strava's review.
+1. Lag en API-app på https://www.strava.com/settings/api. Sett *Authorization Callback Domain*
+   til appens domene (`127.0.0.1` lokalt).
+2. Legg `STRAVA_CLIENT_ID` og `STRAVA_CLIENT_SECRET` i `.env`.
+3. En ny Strava-app tillater bare deg selv. Øk til 10 deltakere i API-innstillingene (krever
+   Strava-abonnement); flere enn 10 krever godkjenning fra Strava.
+4. Slå på sanntids-synk under Admin → Regler, så kommer øktene inn med en gang.
 
-Participants press «Koble til Strava» under *Meg*. Workouts are fetched when they connect, when they
-press «Hent nye økter», and automatically every 10 minutes while anyone is using the app.
+## Sett opp din egen
 
-## Deploying
+Appen er laget for én gruppe per installasjon. Vil du ha flere grupper, setter du opp én kopi
+for hver, med egen database.
 
-Live at https://svettebotta.vercel.app (Vercel project «svettebotta» on Preben's projects, region
-fra1). Every push to `main` deploys. The database is a free Neon project (Frankfurt) in the
-personal Neon organisation – not the Vercel-managed one, which is on a paid plan.
+1. Lag en gratis Postgres-database, for eksempel hos [Neon](https://neon.tech).
+2. Importer repoet i [Vercel](https://vercel.com).
+3. Legg inn miljøvariablene fra `.env.example`: `DATABASE_URL`, `APP_URL`, `CRON_SECRET` og
+   eventuelt Strava-nøklene. `CRON_SECRET` må være satt, ellers sendes ingen påminnelser.
+4. Deploy. Databasen settes opp automatisk, siden `npm run build` kjører migreringene først.
+5. Åpne appen, lag kontoen din (du blir admin) og sett opp utfordringen under Admin.
 
-Environment: `DATABASE_URL` (pooled Neon string), `APP_URL` (https://svettebotta.vercel.app) and,
-once set up, the Strava keys. `npm run build` runs the migrations first, so a deploy always brings
-the database schema up to date.
+## Lisens
+
+MIT, se [LICENSE](LICENSE). Strava-logoene i `public/strava` tilhører Strava og brukes etter
+[Stravas retningslinjer](https://developers.strava.com/guidelines/).

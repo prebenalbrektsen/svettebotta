@@ -111,7 +111,7 @@ export function sportBoards(stats: PersonStats[]) {
   return [...SPORT_BOARDS.map(sportBoard), ELEVATION].filter((b) => stats.some((p) => b.value(p) > 0));
 }
 
-export type BoardId = string;
+type BoardId = string;
 
 export function rank(stats: PersonStats[], boardId: BoardId) {
   const all = [...BOARDS, ...SPORT_BOARDS.map(sportBoard), ELEVATION];
